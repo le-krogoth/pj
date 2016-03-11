@@ -27,141 +27,98 @@
 
 #include <ESP8266WiFi.h>
 #include "Esp.h" // deep sleep and system info
-#include <ArduinoJson.h> // json parser
 #include <EEPROM.h> // to store status/registration in
+#include "global.h"
+#include "comm.h"
+#include "flow.h"
+#include "handler.h"
 
 // ESP8266 SDK headers are in C, they need to be included externally or else 
 // they will throw an error compiling/linking.
 //
 // all SDK .c files required can be added between the { }
 //extern "C" {
+// #include "user_interface.h"
 //}
 
-// change these to your setup
-const char* SSID  = "hardac";
-const char* PWD   = "hardac";
+// ------------------------------------------------------------------
 
-// where your hardac server is running
-const char* SERVER  = "0.0.0.0";
-const int PORT      = 8765;
+String sPJDeviceId = "notinitialised";
 
-// EEPROM addressing
-const int EEPROM_REGKEY_ADDRESS = 0;
-// value if registered
-const byte REGISTERED = 0x5F;
-
-// http reply struct
-struct REPLY 
-{
-  int iStatusCd;
-  String sReply;
-};
-typedef struct REPLY reply;
-
-// device_id
-String sDeviceId = "notinitialised";
+state globalState;
 
 // ------------------------------------------------------------------
-// used to turn off GPIO Pi
-void turnOff(int pin) 
+// ------------------------------------------------------------------
+
+
+// ------------------------------------------------------------------
+void rightPinFalling ()
 {
-  pinMode(pin, OUTPUT);
-  digitalWrite(pin, 1);
+  Serial.println("Falling wink from right pin.");
+  globalState.bRightButtonDown = true;
+
+  checkEasterEggMode(&globalState);
 }
 
 // ------------------------------------------------------------------
-// call URL, return statuscode and JSON
-reply callUrl(String sUrl)
+void rightPinRising ()
 {
-  reply r;
+  Serial.println("Rising wink from right pin.");
+  globalState.bRightButtonDown = false;
 
-  r.iStatusCd = 0;
-  r.sReply = "";
-  
-  Serial.print("Connecting to ");
-  Serial.println(SERVER);
-  
-  // Use WiFiClient class to create TCP connections
-  // todo: change to WiFiClientSecure when ready so as to make sniffing a bit more complex
-  WiFiClient client;
-
-  // todo: we should probably wait here or sleep here until we can connect
-  // so we do not drain the battery too much
-  if (!client.connect(SERVER, PORT)) {
-    Serial.println("Connection failed, trying later...");
-    return r;
-  }
-  
-  // We now create a URI for the request
-  Serial.print("Requesting URL: ");
-  Serial.println(sUrl);
-  
-  // This will send the request to the server
-  client.print(String("GET ") + sUrl + " HTTP/1.1\r\n" + "Host: " + SERVER + "\r\n" + "Connection: close\r\n\r\n");
-               
-  // just a short delay to give other components the chance to do something else
-  delay(100);
-
-  // handling of response
-  Serial.println("");
-  Serial.println("Response:");
-  
-  // Read line by line
-  while(client.available())
-  {
-    String sLine = client.readStringUntil('\r');
-
-    // make sure to not have whitespaces so that the very basic parser will not fail
-    Serial.print(sLine);
-    sLine.trim();
-
-    if (sLine.startsWith("HARDAC-STATUS: ")) 
-    {
-        String sStatus = sLine.substring(14, 18);
-
-        r.iStatusCd = (int)sStatus.toInt();
-    } 
-    // todo: how can we detect the JSON payload?
-    else if (sLine.startsWith("{ \"colour_1\": ")) 
-    {
-      r.sReply = sLine;
-    }
-  }
-
-  Serial.println("EOF.");
-  if (!client.connected()) 
-  {
-    // free up memory
-    client.stop();
-  }
-  
-  return r;
+  checkEasterEggMode(&globalState);
+  checkVote('R', &globalState);
 }
 
 // ------------------------------------------------------------------
-bool registerPJ()
+void leftPinFalling ()
 {
-  // register with backend  
-  String sUrl = "/" + sDeviceId + "/r/public_key/";
-  reply r = callUrl(sUrl);
+  Serial.println("Falling wink from left pin.");
+  globalState.bLeftButtonDown = true;
 
-  if(r.iStatusCd != 201)
-  {
-    Serial.print("Registration of PJ failed with StatusCode: ");
-    Serial.println(r.iStatusCd);
-  }
-  else
-  {
-    // registration successful, make sure, that device knows after reboot
-    EEPROM.write(EEPROM_REGKEY_ADDRESS, REGISTERED);
-    EEPROM.commit();
-    Serial.println("Registration of PJ succeeded.");
-  }
+  checkEasterEggMode(&globalState);
 }
 
-// todo: unregister when asked by backend
-bool unregisterPJ()
+// ------------------------------------------------------------------
+void leftPinRising ()
 {
+  Serial.println("Rising wink from left pin.");
+  globalState.bLeftButtonDown = false;
+
+  checkEasterEggMode(&globalState);
+  checkVote('L', &globalState);
+}
+
+// ------------------------------------------------------------------
+void setupPins() 
+{  
+  attachInterrupt(LEFT_BUTTON, leftPinFalling, FALLING);
+  attachInterrupt(LEFT_BUTTON, leftPinRising, RISING);
+  attachInterrupt(RIGHT_BUTTON, rightPinFalling, FALLING);
+  attachInterrupt(RIGHT_BUTTON, rightPinRising, RISING);
+
+  pinMode(LED_LEFT_R, OUTPUT);
+  pinMode(LED_LEFT_G, OUTPUT);
+  pinMode(LED_LEFT_B, OUTPUT);
+
+  digitalWrite(LED_LEFT_R, 0);
+  digitalWrite(LED_LEFT_G, 0);
+  digitalWrite(LED_LEFT_B, 0);
+
+  digitalWrite(LED_RIGHT_R, 0);
+  digitalWrite(LED_RIGHT_G, 0);
+  digitalWrite(LED_RIGHT_B, 0);
+
+  // analogWrite(pin, value) enables software PWM on the given pin. PWM may be used on pins 0 to 16. 
+  // Call analogWrite(pin, 0) to disable PWM on the pin. value may be in range from 0 to PWMRANGE, 
+  // which is equal to 1023 by default. PWM range may be changed by calling analogWriteRange(new_range).
+
+  // we know 0 to 255 as colour values
+  analogWriteRange(255);
+  
+  // PWM frequency is 1kHz by default. Call analogWriteFreq(new_frequency) to change the frequency.
+  // 50 Hz is more than OK for us for now
+  analogWriteFreq(50);
 }
 
 // ------------------------------------------------------------------
@@ -172,24 +129,51 @@ void setup() {
   // start a serial console for debugging purposes
   // todo: remove when going into production?
   Serial.begin(115200);
-  delay(500);
+  Serial.println("");
+  delay(1000);
 
-  // disable all unneeded output ports to save power
-  turnOff(0);
+  globalState = (state) { .ulTicksAtLoopStart = 0,
+                          .ulLastModeChangeAt = 0,
+                          .bytCurrentMode = MODE_INIT, 
+                          .bytNextMode = MODE_NONE,
+                          .cLeft = (char) 0, 
+                          .cRight = (char) 0, 
+                          .cVote = (char) 0,
+                          .cLastButtons = (char) 0, 
+                          .shPosLeft = 0, 
+                          .shPosRight = 0, 
+                          .bLeftButtonDown = false, 
+                          .bRightButtonDown = false };
 
+  // set all needed ports and disable unneeded output ports to save power
+  setupPins();
+
+  WiFi.mode(WIFI_STA);
+  
   // get the wifi up and running
   WiFi.begin(SSID, PWD);
 
   Serial.print("Connecting to network: ");
   Serial.println(SSID);
 
-  // todo: this loops until things get connected to the wireless network
+  // TODO: this loops until things get connected to the wireless network
   // should we cancel after a few attempts and sleep instead to not drain
   // the battery too much when out of reach?
-  while (WiFi.status() != WL_CONNECTED) 
+  unsigned long lStart = millis();
+  while (WiFi.status() != WL_CONNECTED && lStart + 20000 > millis()) 
   {
     delay(500);
     Serial.print(".");
+  }
+
+  // go back into deep sleep mode for now when there is no wifi
+  // TODO: add this check to the state machine?
+  if(WiFi.status() != WL_CONNECTED)
+  {
+    Serial.println("");
+    Serial.println("Wifi not available, going to sleep.");
+    ESP.deepSleep(1 * 10 * 1000000, WAKE_RF_DEFAULT);
+    delay(1000);  
   }
 
   // print out stats
@@ -211,15 +195,15 @@ void setup() {
   // Serial.println(ESP.getChipId());
   // Serial.print("Flash ID: ");
   // Serial.println(ESP.getFlashChipId());
-  sDeviceId = String(ESP.getChipId()) + "_" + String(ESP.getFlashChipId());
-  Serial.println("DeviceId: " + sDeviceId);
+  sPJDeviceId = String(ESP.getChipId()) + "_" + String(ESP.getFlashChipId());
+  Serial.println("DeviceId: " + sPJDeviceId);
 
   delay(500);
   
   // check if registered already (check EEPROM), register with HARDAC otherwise.
-  if(sDeviceId.length() <= 1)
+  if(sPJDeviceId.length() <= 1)
   {
-    Serial.println("sDeviceId is too small. " + sDeviceId);
+    Serial.println("sDeviceId is too small. " + sPJDeviceId);
   }
   else
   {
@@ -234,64 +218,15 @@ void setup() {
     if(byRegKey != REGISTERED)
     {
       Serial.println("PJ is not registered yet.");
-      registerPJ();
+      registerPJ(sPJDeviceId);
     }
   }
-}
 
-// ------------------------------------------------------------------
-// todo: this generic method will become a handle response to status message function
-// parse json response, act accordingly
-// checking on statuscode makes no sense like that
-void handleReply(reply r)
-{
-  Serial.println("");
-  Serial.println("Handling Reply");
-      
-  switch (r.iStatusCd) 
-  {
-    case 200:
-      Serial.println("Request successfull.");
-      break;
-    case 201:
-      Serial.println("Registration successfull.");
-      break;
-    case 202:
-      Serial.println("Ballot sent successfully.");
-      break;
-    case 400:
-      Serial.println("Not all parameters were given.");
-      break;
-    case 403:
-      Serial.println("Function called without being registered.");
-      break;
-    case 420:
-      Serial.println("Re-registration attempt, HARDAC tells us to calm down.");
-      break;
-    default:
-      Serial.println("That status code is not known (yet): '" + String(r.iStatusCd) + "' with line: " + r.sReply);
-    break;
-  }
-
-  // { "colour_1": "R", "colour_2": "B" }
-  if(r.sReply.length() > 24)
-  {
-    StaticJsonBuffer<200> jsonBuffer;
-    JsonObject& root = jsonBuffer.parseObject(r.sReply);
-    
-    const char* colour1 = root["colour_1"];
-    const char* colour2 = root["colour_2"];
+  // initialise state
   
-    Serial.print("colour1: ");
-    Serial.println(colour1);
-    Serial.print("colour2: ");
-    Serial.println(colour2);
-  }
-  else
-  {
-    Serial.println("JSON seems not to be valid.");
-  }
 }
+
+
 
 // ------------------------------------------------------------------
 // will be called right after setup and then in a loop after every deep sleep cycle
@@ -301,23 +236,80 @@ void loop() {
   // todo: remove me when implementing deep sleep
   // delay(5000);
 
-  // todo: check if button was pressed
-  // if so, send ballot to server
-  // otherwise just ask for current status
-  // we also could just skip the status every other round
+  globalState.ulTicksAtLoopStart = ESP.getCycleCount();
 
-  // ask HARDAC for status and actions
-  String sUrl = "/" + sDeviceId + "/s/";
-  reply r = callUrl(sUrl);
+  Serial.println("--");
+  Serial.println("--------------------------------------------------------------------");
+  Serial.println("Modes");
+  Serial.print("- Current Mode: ");
+  Serial.println(globalState.bytCurrentMode);
+  Serial.print("- Next Mode: ");
+  Serial.println(globalState.bytNextMode);
 
-  handleReply(r);
+  // enable wifi if next mode needs it and current has not active already
+  if((globalState.bytCurrentMode != MODE_VOTE && globalState.bytCurrentMode != MODE_UPDATE)
+      && globalState.bytNextMode == MODE_VOTE || globalState.bytNextMode == MODE_UPDATE)
+  {
+    WiFi.forceSleepWake();
+    Serial.println("Force Sleep Wake");
+  }
+  else
+  {
+    WiFi.forceSleepBegin();
+    Serial.println("Force Sleep Begin");
+  }
+
+  // switch modes?
+  if(globalState.bytNextMode != MODE_NONE)
+  {
+    Serial.println("Switching modes");
+
+    globalState.ulLastModeChangeAt = ESP.getCycleCount();
+
+    // depending on the new mode, do the transformation
+    globalState.bytCurrentMode = globalState.bytNextMode;
+    globalState.bytNextMode = MODE_NONE;
+
+    Serial.print("- Current Mode: ");
+    Serial.println(globalState.bytCurrentMode);
+    Serial.print("- Next Mode: ");
+    Serial.println(globalState.bytNextMode);
+  }
+
+  switch(globalState.bytCurrentMode)
+  {
+    default:
+    case MODE_IDLE:
+      // sleep and wait, change mode to Update after N loops
+      handleIdle(&globalState);
+    break;
+    case MODE_INIT:
+      // Initialise something? otherwise head right into Update mode.
+      globalState.bytNextMode = MODE_UPDATE;
+      break;
+    case MODE_UPDATE:
+      handleUpdate(&globalState);
+      break;
+    case MODE_MOVIE:
+      handleMovie(&globalState);
+      break;
+    case MODE_VOTE:
+      handleVote(&globalState);
+      break;
+    case MODE_EASTEREGG:
+      handleEasterEgg(&globalState);
+    break;
+  }
   
   Serial.println();
-  Serial.println("Closing connection, going to deep sleep");
+  Serial.println("Ending loop");
   delay(1000);
 
   // go to deepsleep for 10 seconds
-  ESP.deepSleep(1 * 10 * 1000000, WAKE_RF_DEFAULT);
+  //ESP.deepSleep(1 * 10 * 1000000, WAKE_RF_DEFAULT);
   delay(1000);
+
+  Serial.print("Time used: ");
+  Serial.println(ESP.getCycleCount() - globalState.ulTicksAtLoopStart);
 }
 
