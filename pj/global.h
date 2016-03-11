@@ -56,6 +56,10 @@ static const int LED_RIGHT_B = 10;
 // EEPROM addressing
 static const int EEPROM_REGKEY_ADDRESS = 0;
 
+// IDLE Mode Loop Time in Seconds (for now)
+static const long IDLE_MODE_LOOP_TIME = 10;
+static const int SECONDS_TO_MILLIS = 1000;
+
 // value in EEPROM if this pj is registered
 static const byte REGISTERED = 0x5F;
 

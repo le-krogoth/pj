@@ -31,9 +31,6 @@
 #include <ESP8266WiFi.h>
 
 // ------------------------------------------------------------------
-// todo: this generic method will become a handle response to status message function
-// parse json response, act accordingly
-// checking on statuscode makes no sense like that
 void handleReply(reply r, state *globalState)
 {
   Serial.println("");
@@ -83,9 +80,13 @@ void handleReply(reply r, state *globalState)
     Serial.println("JSON seems not to be valid.");
   }
 
+  // be sure to move back to IDLE mode after handling the reply
+  // TODO: this line is in here because I am unsure if we only
+  // should go back to IDLE mode if everything worked...
   (*globalState).bytNextMode = MODE_IDLE;
 }
 
+// ------------------------------------------------------------------
 void handleEasterEgg(state *globalState)
 {
   Serial.println("Handle Easter Egg");
@@ -111,15 +112,19 @@ void handleEasterEgg(state *globalState)
   }  
 }
 
+// ------------------------------------------------------------------
 void handleIdle(state *globalState)
 {
-  if((*globalState).ulLastModeChangeAt + 480000000 <= ESP.getCycleCount())
+  
+  if(millis() - (*globalState).ulLastModeChangeAt >= (IDLE_MODE_LOOP_TIME * SECONDS_TO_MILLIS) )
   {
     Serial.println("Changing from idle to update");
-    // (*globalState).bytNextMode = MODE_UPDATE;
+    // if enough time passed, go into UPDATE mode
+    (*globalState).bytNextMode = MODE_UPDATE;
   }
 }
 
+// ------------------------------------------------------------------
 void handleUpdate(state *globalState)
 {
   Serial.println("Handle Update");
@@ -131,11 +136,16 @@ void handleUpdate(state *globalState)
   handleReply(r, globalState);
 }
 
+// ------------------------------------------------------------------
 void handleMovie(state *globalState)
 {
   Serial.println("Handle Movie");
+
+  // if movie is over, go back to IDLE
+  (*globalState).bytNextMode = MODE_IDLE;
 }
 
+// ------------------------------------------------------------------
 void handleVote(state *globalState)
 {
   Serial.println("Handle Vote");

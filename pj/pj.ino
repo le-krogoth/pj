@@ -54,7 +54,7 @@ state globalState;
 // ------------------------------------------------------------------
 void rightPinFalling ()
 {
-  Serial.println("Falling wink from right pin.");
+  Serial.println("** Falling wink from right pin.");
   globalState.bRightButtonDown = true;
 
   checkEasterEggMode(&globalState);
@@ -63,17 +63,16 @@ void rightPinFalling ()
 // ------------------------------------------------------------------
 void rightPinRising ()
 {
-  Serial.println("Rising wink from right pin.");
+  Serial.println("** Rising wink from right pin.");
   globalState.bRightButtonDown = false;
 
-  checkEasterEggMode(&globalState);
   checkVote('R', &globalState);
 }
 
 // ------------------------------------------------------------------
 void leftPinFalling ()
 {
-  Serial.println("Falling wink from left pin.");
+  Serial.println("** Falling wink from left pin.");
   globalState.bLeftButtonDown = true;
 
   checkEasterEggMode(&globalState);
@@ -82,18 +81,17 @@ void leftPinFalling ()
 // ------------------------------------------------------------------
 void leftPinRising ()
 {
-  Serial.println("Rising wink from left pin.");
+  Serial.println("** Rising wink from left pin.");
   globalState.bLeftButtonDown = false;
 
-  checkEasterEggMode(&globalState);
   checkVote('L', &globalState);
 }
 
 // ------------------------------------------------------------------
 void setupPins() 
 {  
-  attachInterrupt(LEFT_BUTTON, leftPinFalling, FALLING);
-  attachInterrupt(LEFT_BUTTON, leftPinRising, RISING);
+  attachInterrupt(digitalPinToInterrupt(LEFT_BUTTON), leftPinFalling, FALLING);
+  attachInterrupt(digitalPinToInterrupt(LEFT_BUTTON), leftPinRising, RISING);
   attachInterrupt(RIGHT_BUTTON, rightPinFalling, FALLING);
   attachInterrupt(RIGHT_BUTTON, rightPinRising, RISING);
 
@@ -132,7 +130,8 @@ void setup() {
   Serial.println("");
   delay(1000);
 
-  globalState = (state) { .ulTicksAtLoopStart = 0,
+  // initialise state
+  globalState = (state) { .ulLoopStartAt = 0,
                           .ulLastModeChangeAt = 0,
                           .bytCurrentMode = MODE_INIT, 
                           .bytNextMode = MODE_NONE,
@@ -160,7 +159,7 @@ void setup() {
   // should we cancel after a few attempts and sleep instead to not drain
   // the battery too much when out of reach?
   unsigned long lStart = millis();
-  while (WiFi.status() != WL_CONNECTED && lStart + 20000 > millis()) 
+  while (WiFi.status() != WL_CONNECTED && lStart + (20 * SECONDS_TO_MILLIS) > millis()) 
   {
     delay(500);
     Serial.print(".");
@@ -221,22 +220,22 @@ void setup() {
       registerPJ(sPJDeviceId);
     }
   }
-
-  // initialise state
-  
 }
 
-
+void printWIFIStrength()
+{
+  long rssi = WiFi.RSSI();
+  Serial.print("Signal strength (RSSI):");
+  Serial.print(rssi);
+  Serial.println(" dBm");
+}
 
 // ------------------------------------------------------------------
 // will be called right after setup and then in a loop after every deep sleep cycle
 // since we (currently) deep sleep after every cycle...
 void loop() {
 
-  // todo: remove me when implementing deep sleep
-  // delay(5000);
-
-  globalState.ulTicksAtLoopStart = ESP.getCycleCount();
+  globalState.ulLoopStartAt = millis();
 
   Serial.println("--");
   Serial.println("--------------------------------------------------------------------");
@@ -248,14 +247,14 @@ void loop() {
 
   // enable wifi if next mode needs it and current has not active already
   if((globalState.bytCurrentMode != MODE_VOTE && globalState.bytCurrentMode != MODE_UPDATE)
-      && globalState.bytNextMode == MODE_VOTE || globalState.bytNextMode == MODE_UPDATE)
+      && (globalState.bytNextMode == MODE_VOTE || globalState.bytNextMode == MODE_UPDATE))
   {
-    WiFi.forceSleepWake();
+    //WiFi.forceSleepWake();
     Serial.println("Force Sleep Wake");
   }
   else
   {
-    WiFi.forceSleepBegin();
+    //WiFi.forceSleepBegin();
     Serial.println("Force Sleep Begin");
   }
 
@@ -264,7 +263,7 @@ void loop() {
   {
     Serial.println("Switching modes");
 
-    globalState.ulLastModeChangeAt = ESP.getCycleCount();
+    globalState.ulLastModeChangeAt = millis();
 
     // depending on the new mode, do the transformation
     globalState.bytCurrentMode = globalState.bytNextMode;
@@ -288,6 +287,7 @@ void loop() {
       globalState.bytNextMode = MODE_UPDATE;
       break;
     case MODE_UPDATE:
+      printWIFIStrength();
       handleUpdate(&globalState);
       break;
     case MODE_MOVIE:
@@ -307,9 +307,9 @@ void loop() {
 
   // go to deepsleep for 10 seconds
   //ESP.deepSleep(1 * 10 * 1000000, WAKE_RF_DEFAULT);
-  delay(1000);
+  // delay(1000);
 
   Serial.print("Time used: ");
-  Serial.println(ESP.getCycleCount() - globalState.ulTicksAtLoopStart);
+  Serial.println(millis() - globalState.ulLoopStartAt);
 }
 

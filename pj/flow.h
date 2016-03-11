@@ -42,7 +42,7 @@ static const byte MODE_EASTEREGG  = 0x06;
 // state structure for state machine
 typedef struct
 {
-  unsigned long ulTicksAtLoopStart;
+  unsigned long ulLoopStartAt;
   unsigned long ulLastModeChangeAt;
   byte bytCurrentMode;
   byte bytNextMode;

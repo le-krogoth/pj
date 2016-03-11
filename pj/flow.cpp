@@ -30,18 +30,32 @@
 
 void checkEasterEggMode(state *globalState)
 {
+  Serial.println("Checking Easter Egg Mode");
+  Serial.print("Left button: ");
+  Serial.print((*globalState).bLeftButtonDown);
+  Serial.print("Right button: ");
+  Serial.println((*globalState).bRightButtonDown);
+    
   // if both buttons are down, we either leave or enter the easter egg mode
   if((*globalState).bLeftButtonDown && (*globalState).bRightButtonDown)  
   {
+    Serial.println("Both buttons down");
+    Serial.println((*globalState).bytCurrentMode != MODE_EASTEREGG ? MODE_EASTEREGG : MODE_IDLE);
+
     (*globalState).bytNextMode = (*globalState).bytCurrentMode != MODE_EASTEREGG ? MODE_EASTEREGG : MODE_IDLE;
   }
 }
 
 void checkVote(char cVote, state *globalState)
 {
+  Serial.println("Checking Vote");
+  
   // if we do not leave nor join the easter egg mode, this is a vote then
   if((*globalState).bytCurrentMode != MODE_EASTEREGG && (*globalState).bytNextMode != MODE_EASTEREGG)
   {
+    Serial.print("Let's vote: ");
+    Serial.println(cVote);
+  
     (*globalState).bytNextMode = MODE_VOTE;
     (*globalState).cVote = cVote;
   }
