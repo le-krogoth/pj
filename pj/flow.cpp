@@ -59,4 +59,9 @@ void checkVote(char cVote, state *globalState)
     (*globalState).bytNextMode = MODE_VOTE;
     (*globalState).cVote = cVote;
   }
+  else
+  {
+    Serial.print("No voting, still in easter egg mode.");
+    Serial.println("");
+  }
 }

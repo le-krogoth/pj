@@ -52,48 +52,48 @@ state globalState;
 
 
 // ------------------------------------------------------------------
-void rightPinFalling ()
+void rightPinChanges()
 {
-  Serial.println("** Falling wink from right pin.");
-  globalState.bRightButtonDown = true;
-
-  checkEasterEggMode(&globalState);
+  if(digitalRead(RIGHT_BUTTON) == LOW)
+  {
+    Serial.println("** Falling wink from right pin.");
+    globalState.bRightButtonDown = true;
+  
+    checkEasterEggMode(&globalState);
+  }
+  else
+  {
+    Serial.println("** Rising wink from right pin.");
+    globalState.bRightButtonDown = false;
+  
+    checkVote('R', &globalState);
+  }  
 }
 
 // ------------------------------------------------------------------
-void rightPinRising ()
+void leftPinChanges()
 {
-  Serial.println("** Rising wink from right pin.");
-  globalState.bRightButtonDown = false;
-
-  checkVote('R', &globalState);
-}
-
-// ------------------------------------------------------------------
-void leftPinFalling ()
-{
-  Serial.println("** Falling wink from left pin.");
-  globalState.bLeftButtonDown = true;
-
-  checkEasterEggMode(&globalState);
-}
-
-// ------------------------------------------------------------------
-void leftPinRising ()
-{
-  Serial.println("** Rising wink from left pin.");
-  globalState.bLeftButtonDown = false;
-
-  checkVote('L', &globalState);
+  if(digitalRead(RIGHT_BUTTON) == LOW)
+  {
+    Serial.println("** Falling wink from left pin.");
+    globalState.bLeftButtonDown = true;
+  
+    checkEasterEggMode(&globalState);
+  }
+  else
+  {
+    Serial.println("** Rising wink from left pin.");
+    globalState.bLeftButtonDown = false;
+  
+    checkVote('L', &globalState);
+  }  
 }
 
 // ------------------------------------------------------------------
 void setupPins() 
-{  
-  attachInterrupt(digitalPinToInterrupt(LEFT_BUTTON), leftPinFalling, FALLING);
-  attachInterrupt(digitalPinToInterrupt(LEFT_BUTTON), leftPinRising, RISING);
-  attachInterrupt(RIGHT_BUTTON, rightPinFalling, FALLING);
-  attachInterrupt(RIGHT_BUTTON, rightPinRising, RISING);
+{
+  attachInterrupt(digitalPinToInterrupt(LEFT_BUTTON), leftPinChanges, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(RIGHT_BUTTON), rightPinChanges, CHANGE);
 
   pinMode(LED_LEFT_R, OUTPUT);
   pinMode(LED_LEFT_G, OUTPUT);
@@ -102,6 +102,10 @@ void setupPins()
   digitalWrite(LED_LEFT_R, 0);
   digitalWrite(LED_LEFT_G, 0);
   digitalWrite(LED_LEFT_B, 0);
+
+  //pinMode(LED_RIGHT_R, OUTPUT);
+  //pinMode(LED_RIGHT_G, OUTPUT);
+  //pinMode(LED_RIGHT_B, OUTPUT);
 
   digitalWrite(LED_RIGHT_R, 0);
   digitalWrite(LED_RIGHT_G, 0);
@@ -127,8 +131,12 @@ void setup() {
   // start a serial console for debugging purposes
   // todo: remove when going into production?
   Serial.begin(115200);
+  Serial.setDebugOutput(true);
   Serial.println("");
   delay(1000);
+
+  // set all needed ports and disable unneeded output ports to save power
+  setupPins();
 
   // initialise state
   globalState = (state) { .ulLoopStartAt = 0,
@@ -143,9 +151,6 @@ void setup() {
                           .shPosRight = 0, 
                           .bLeftButtonDown = false, 
                           .bRightButtonDown = false };
-
-  // set all needed ports and disable unneeded output ports to save power
-  setupPins();
 
   WiFi.mode(WIFI_STA);
   
