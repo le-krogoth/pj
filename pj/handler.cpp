@@ -31,10 +31,10 @@
 #include <ESP8266WiFi.h>
 
 // ------------------------------------------------------------------
-void handleReply(reply r, state *globalState)
+void handleUpdateReply(reply r)
 {
   Serial.println("");
-  Serial.println("Handling Reply");
+  Serial.println("Handling Update Reply");
       
   switch (r.iStatusCd) 
   {
@@ -61,7 +61,7 @@ void handleReply(reply r, state *globalState)
     break;
   }
 
-  // { "colour_1": "R", "colour_2": "B" }
+  // { "colour_1": "R", "colour_2": "B", "idle_time": "cycles?" }
   if(r.iStatusCd != 0 && r.sReply.length() > 24)
   {
     StaticJsonBuffer<200> jsonBuffer;
@@ -69,25 +69,90 @@ void handleReply(reply r, state *globalState)
     
     const char* colour1 = root["colour_1"];
     const char* colour2 = root["colour_2"];
-  
+
     Serial.print("colour1: ");
     Serial.println(colour1);
     Serial.print("colour2: ");
     Serial.println(colour2);
+
+    char* cMovie = "F0090F0900F9";
+    
+    int iMovieLength = strlen(cMovie);
+    int iMovieElements = iMovieLength / 4;
+    
+    int pos = 0;
+    short location = 0;
+
+    for(int i = 0; i < iMovieElements; i++)
+    {
+        movieframe *temp;
+
+        temp = addMFLeft(cMovie[pos], cMovie[pos + 1], cMovie[pos + 2], location);
+
+        location += (cMovie[pos + 3] - '0');
+
+        pos += 4;
+    }
+
+    delay(10);
+    
+    Serial.println("Movie file was parsed like that:");
+    for(int i = 0; i < gs->iMovieLeftFrameCount; i++)
+    {
+        Serial.print("Element ");
+        Serial.print(i);
+        Serial.print(" has values R:");
+        Serial.print(gs->movieLeft[i].r);
+        Serial.print(" G:");
+        Serial.print(gs->movieLeft[i].g);
+        Serial.print(" B:");
+        Serial.print(gs->movieLeft[i].b);
+        Serial.print(" at ");
+        Serial.println(gs->movieLeft[i].position);
+    }
+
+    Serial.print("iMovieLeftFrameCapacity: ");
+    Serial.println(gs->iMovieLeftFrameCapacity);
+    
+    Serial.print("MovieLeftFrameCount: ");
+    Serial.println(gs->iMovieLeftFrameCount);
+
+    gs->lMovieLength = gs->iMovieLeftFrameCount > gs->iMovieRightFrameCount ? gs->iMovieLeftFrameCount : gs->iMovieRightFrameCount;
+
+    gs->lMoviePosition = 0;
+    gs->bytNextMode = MODE_MOVIE;
+
+    Serial.println("Leaving handling function.");
+
   }
   else
   {
     Serial.println("JSON seems not to be valid.");
+    gs->bytNextMode = MODE_IDLE;
   }
-
-  // be sure to move back to IDLE mode after handling the reply
-  // TODO: this line is in here because I am unsure if we only
-  // should go back to IDLE mode if everything worked...
-  (*globalState).bytNextMode = MODE_IDLE;
 }
 
 // ------------------------------------------------------------------
-void handleEasterEgg(state *globalState)
+void handleVoteReply(reply r)
+{
+  Serial.println("");
+  Serial.println("Handling Vote Reply");
+      
+  if(r.iStatusCd == 202)
+  {
+    // tell user that it worked
+    // 
+    gs->bytNextMode = MODE_IDLE;
+  }
+  else
+  {
+    Serial.println("JSON seems not to be valid.");
+    gs->bytNextMode = MODE_IDLE;
+  }
+}
+
+// ------------------------------------------------------------------
+void handleEasterEgg()
 {
   Serial.println("Handle Easter Egg");
   
@@ -113,19 +178,74 @@ void handleEasterEgg(state *globalState)
 }
 
 // ------------------------------------------------------------------
-void handleIdle(state *globalState)
+void handleIdle()
 {
   
-  if(millis() - (*globalState).ulLastModeChangeAt >= (IDLE_MODE_LOOP_TIME * SECONDS_TO_MILLIS) )
+  if(millis() - gs->ulLastModeChangeAt >= (IDLE_MODE_LOOP_TIME * SECONDS_TO_MILLIS) )
   {
     Serial.println("Changing from idle to update");
     // if enough time passed, go into UPDATE mode
-    (*globalState).bytNextMode = MODE_UPDATE;
+    gs->bytNextMode = MODE_UPDATE;
   }
 }
 
 // ------------------------------------------------------------------
-void handleUpdate(state *globalState)
+void handleMovie()
+{
+  Serial.println("Handle Movie");
+
+   // find out if we have to change colour
+    // for that: run through movie array, check movie.position, change colour when movie.position matches lMoviePosition
+    for(int i = 0; i < gs->iMovieLeftFrameCount; i++)
+    {
+        int iPos = gs->movieLeft[i].position;
+        if(iPos > gs->lMoviePosition)
+        {
+            Serial.println("iPos > lMoviePosition, breaking");
+            break;
+        }
+        else if(iPos == gs->lMoviePosition)
+        {
+            Serial.println("BLINK");
+            Serial.print("Element ");
+            Serial.print(i);
+            Serial.print(" has values R:");
+            Serial.print(gs->movieLeft[i].r);
+            Serial.print(" G:");
+            Serial.print(gs->movieLeft[i].g);
+            Serial.print(" B:");
+            Serial.print(gs->movieLeft[i].b);
+            Serial.print(" at ");
+            Serial.println(gs->movieLeft[i].position);
+            break;
+        }
+        else
+        {
+            Serial.print(".");
+        }
+    }
+
+    Serial.println("");
+
+  // continue position to the next
+  gs->lMoviePosition++;
+
+  // if the movie is over, clean up and leave this mode
+  if(gs->lMoviePosition >= gs->lMovieLength)
+  {
+    // TODO: fix memory allocation here?
+    gs->lMoviePosition = 0;
+    gs->iMovieLeftFrameCount = 0;
+    gs->iMovieRightFrameCount = 0;
+    gs->lMovieLength = 0;
+    
+    // if movie is over, go back to IDLE
+    gs->bytNextMode = MODE_IDLE;      
+  }
+}
+
+// ------------------------------------------------------------------
+void handleUpdate()
 {
   Serial.println("Handle Update");
   
@@ -133,27 +253,19 @@ void handleUpdate(state *globalState)
   String sUrl = "/" + sPJDeviceId + "/s/";
   reply r = callUrl(sUrl);
 
-  handleReply(r, globalState);
+  handleUpdateReply(r);
 }
 
 // ------------------------------------------------------------------
-void handleMovie(state *globalState)
-{
-  Serial.println("Handle Movie");
-
-  // if movie is over, go back to IDLE
-  (*globalState).bytNextMode = MODE_IDLE;
-}
-
-// ------------------------------------------------------------------
-void handleVote(state *globalState)
+void handleVote()
 {
   Serial.println("Handle Vote");
   
-  // ask HARDAC for status and actions
-  //String sUrl = "/" + sPJDeviceId + "/v/" + cVote + "/";
-  //reply r = callUrl(sUrl);
+  // send ballot to HARDAC
+  // /{device_id}/v/{ballot}
+  
+  String sUrl = "/" + sPJDeviceId + "/v/" + gs->cVote + "/";
+  reply r = callUrl(sUrl);
 
-  //handleReply(r);
-  (*globalState).bytNextMode = MODE_IDLE;
+  handleVoteReply(r);
 }

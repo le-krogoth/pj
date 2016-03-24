@@ -27,6 +27,7 @@
 #ifndef H_FLOW
 #define H_FLOW
 
+#include <stdlib.h>
 
 typedef unsigned char byte;
 
@@ -39,15 +40,30 @@ static const byte MODE_MOVIE      = 0x04;
 static const byte MODE_VOTE       = 0x05;
 static const byte MODE_EASTEREGG  = 0x06;
 
+// one element of a movie
+typedef struct movieframe
+{
+    char r;
+    char g;
+    char b;
+    short position;
+} movieframe;
+
 // state structure for state machine
-typedef struct
+typedef struct state
 {
   unsigned long ulLoopStartAt;
   unsigned long ulLastModeChangeAt;
   byte bytCurrentMode;
   byte bytNextMode;
-  char* cLeft;
-  char* cRight;
+  int iMovieLeftFrameCount;
+  int iMovieLeftFrameCapacity;
+  movieframe *movieLeft;
+  int iMovieRightFrameCount;
+  int iMovieRightFrameCapacity;
+  movieframe *movieRight;
+  long lMoviePosition;
+  long lMovieLength;
   char cVote;
   char* cLastButtons;
   short shPosLeft;
@@ -56,7 +72,11 @@ typedef struct
   bool bRightButtonDown;
 } state;
 
-void checkEasterEggMode(state *globalState);
-void checkVote(char cVote, state *globalState);
+extern state *gs;
+
+movieframe *addMFLeft(const char r, const char g, const char b, const short position);
+movieframe *addMFRight(const char r, const char g, const char b, const short position);
+void checkEasterEggMode();
+void checkVote(char cVote);
 
 #endif // H_FLOW

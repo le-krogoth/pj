@@ -29,15 +29,15 @@
 
 #include <ArduinoJson.h> // json parser
 #include "comm.h" // for reply
-#include "flow.h" // for reply
+#include "flow.h" // for gs
 
 
-void handleReply(reply r, state *globalState);
-void handleEasterEgg(state *globalState);
-void handleIdle(state *globalState);
-void handleUpdate(state *globalState);
-void handleMovie(state *globalState);
-void handleVote(state *globalState);
+void handleUpdateReply(reply r);
+void handleEasterEgg();
+void handleIdle();
+void handleMovie();
+void handleUpdate();
+void handleVote();
 
 
 #endif // H_HANDLER

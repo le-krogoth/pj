@@ -29,8 +29,8 @@
 #include "Esp.h" // deep sleep and system info
 #include <EEPROM.h> // to store status/registration in
 #include "global.h"
-#include "comm.h"
 #include "flow.h"
+#include "comm.h"
 #include "handler.h"
 
 // ESP8266 SDK headers are in C, they need to be included externally or else 
@@ -45,7 +45,7 @@
 
 String sPJDeviceId = "notinitialised";
 
-state globalState;
+state *gs = (state *)calloc(1, sizeof(state));
 
 // ------------------------------------------------------------------
 // ------------------------------------------------------------------
@@ -57,16 +57,16 @@ void rightPinChanges()
   if(digitalRead(RIGHT_BUTTON) == LOW)
   {
     Serial.println("** Falling wink from right pin.");
-    globalState.bRightButtonDown = true;
+    gs->bRightButtonDown = true;
   
-    checkEasterEggMode(&globalState);
+    checkEasterEggMode();
   }
   else
   {
     Serial.println("** Rising wink from right pin.");
-    globalState.bRightButtonDown = false;
+    gs->bRightButtonDown = false;
   
-    checkVote('R', &globalState);
+    checkVote('R');
   }  
 }
 
@@ -76,16 +76,16 @@ void leftPinChanges()
   if(digitalRead(RIGHT_BUTTON) == LOW)
   {
     Serial.println("** Falling wink from left pin.");
-    globalState.bLeftButtonDown = true;
+    gs->bLeftButtonDown = true;
   
-    checkEasterEggMode(&globalState);
+    checkEasterEggMode();
   }
   else
   {
     Serial.println("** Rising wink from left pin.");
-    globalState.bLeftButtonDown = false;
+    gs->bLeftButtonDown = false;
   
-    checkVote('L', &globalState);
+    checkVote('L');
   }  
 }
 
@@ -139,19 +139,48 @@ void setup() {
   setupPins();
 
   // initialise state
-  globalState = (state) { .ulLoopStartAt = 0,
+  // TODO not needed since calloc was used
+  //memset(gs, 0, sizeof(state));
+
+  /*gs = (state) { .ulLoopStartAt = 0,
                           .ulLastModeChangeAt = 0,
                           .bytCurrentMode = MODE_INIT, 
                           .bytNextMode = MODE_NONE,
-                          .cLeft = (char) 0, 
-                          .cRight = (char) 0, 
+                          .movieLeft = { 0 }, 
+                          .movieRight = { 0 },
+                          .lMoviePosition = 0, 
                           .cVote = (char) 0,
                           .cLastButtons = (char) 0, 
                           .shPosLeft = 0, 
                           .shPosRight = 0, 
                           .bLeftButtonDown = false, 
-                          .bRightButtonDown = false };
+                          .bRightButtonDown = false 
+                        };
+                        */
+  gs->ulLoopStartAt = 0;
+  gs->ulLastModeChangeAt = 0;
+  gs->bytCurrentMode = MODE_INIT; 
+  gs->bytNextMode = MODE_NONE;
+  gs->cVote = (char) 0;
+  gs->cLastButtons = (char) 0; 
+  gs->shPosLeft = 0;
+  gs->shPosRight = 0; 
+  gs->bLeftButtonDown = false; 
+  gs->bRightButtonDown = false; 
 
+  // movies
+  gs->iMovieLeftFrameCount = 0;
+  gs->iMovieLeftFrameCapacity = 2;
+  gs->movieLeft = (struct movieframe *)malloc(sizeof(movieframe) * gs->iMovieLeftFrameCapacity);
+
+  gs->iMovieRightFrameCount = 0;
+  gs->iMovieRightFrameCapacity = 2;
+  gs->movieRight = (struct movieframe *)malloc(sizeof(movieframe) * gs->iMovieRightFrameCapacity);
+
+  gs->lMoviePosition = 0; 
+  gs->lMovieLength = 0; 
+
+  //
   WiFi.mode(WIFI_STA);
   
   // get the wifi up and running
@@ -240,19 +269,19 @@ void printWIFIStrength()
 // since we (currently) deep sleep after every cycle...
 void loop() {
 
-  globalState.ulLoopStartAt = millis();
+  gs->ulLoopStartAt = millis();
 
   Serial.println("--");
   Serial.println("--------------------------------------------------------------------");
   Serial.println("Modes");
   Serial.print("- Current Mode: ");
-  Serial.println(globalState.bytCurrentMode);
+  Serial.println(gs->bytCurrentMode);
   Serial.print("- Next Mode: ");
-  Serial.println(globalState.bytNextMode);
+  Serial.println(gs->bytNextMode);
 
   // enable wifi if next mode needs it and current has not active already
-  if((globalState.bytCurrentMode != MODE_VOTE && globalState.bytCurrentMode != MODE_UPDATE)
-      && (globalState.bytNextMode == MODE_VOTE || globalState.bytNextMode == MODE_UPDATE))
+  if((gs->bytCurrentMode != MODE_VOTE && gs->bytCurrentMode != MODE_UPDATE)
+      && (gs->bytNextMode == MODE_VOTE || gs->bytNextMode == MODE_UPDATE))
   {
     //WiFi.forceSleepWake();
     Serial.println("Force Sleep Wake");
@@ -264,45 +293,45 @@ void loop() {
   }
 
   // switch modes?
-  if(globalState.bytNextMode != MODE_NONE)
+  if(gs->bytNextMode != MODE_NONE)
   {
     Serial.println("Switching modes");
 
-    globalState.ulLastModeChangeAt = millis();
+    gs->ulLastModeChangeAt = millis();
 
     // depending on the new mode, do the transformation
-    globalState.bytCurrentMode = globalState.bytNextMode;
-    globalState.bytNextMode = MODE_NONE;
+    gs->bytCurrentMode = gs->bytNextMode;
+    gs->bytNextMode = MODE_NONE;
 
     Serial.print("- Current Mode: ");
-    Serial.println(globalState.bytCurrentMode);
+    Serial.println(gs->bytCurrentMode);
     Serial.print("- Next Mode: ");
-    Serial.println(globalState.bytNextMode);
+    Serial.println(gs->bytNextMode);
   }
 
-  switch(globalState.bytCurrentMode)
+  switch(gs->bytCurrentMode)
   {
     default:
     case MODE_IDLE:
       // sleep and wait, change mode to Update after N loops
-      handleIdle(&globalState);
+      handleIdle();
     break;
     case MODE_INIT:
       // Initialise something? otherwise head right into Update mode.
-      globalState.bytNextMode = MODE_UPDATE;
+      gs->bytNextMode = MODE_UPDATE;
       break;
     case MODE_UPDATE:
       printWIFIStrength();
-      handleUpdate(&globalState);
+      handleUpdate();
       break;
     case MODE_MOVIE:
-      handleMovie(&globalState);
+      handleMovie();
       break;
     case MODE_VOTE:
-      handleVote(&globalState);
+      handleVote();
       break;
     case MODE_EASTEREGG:
-      handleEasterEgg(&globalState);
+      handleEasterEgg();
     break;
   }
   
@@ -315,6 +344,6 @@ void loop() {
   // delay(1000);
 
   Serial.print("Time used: ");
-  Serial.println(millis() - globalState.ulLoopStartAt);
+  Serial.println(millis() - gs->ulLoopStartAt);
 }
 

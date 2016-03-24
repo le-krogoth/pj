@@ -30,7 +30,7 @@
 #include <Arduino.h> //needed for Serial.println
 
 // http reply struct
-typedef struct 
+typedef struct reply
 {
   int iStatusCd;
   String sReply;

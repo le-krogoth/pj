@@ -28,36 +28,78 @@
 #include "global.h"
 #include <ESP8266WiFi.h>
 
-void checkEasterEggMode(state *globalState)
+movieframe *addMFLeft(const char r, const char g, const char b, const short position)
+{
+    if (gs->iMovieLeftFrameCount == gs->iMovieLeftFrameCapacity)
+    {
+        // TODO: define growth size
+        gs->iMovieLeftFrameCapacity += 2;
+
+        gs->movieLeft = (struct movieframe *)realloc(gs->movieLeft, sizeof(state) * gs->iMovieLeftFrameCapacity);
+    }
+
+    movieframe *mf = (gs->movieLeft + gs->iMovieLeftFrameCount);
+    mf->r = r;
+    mf->g = g;
+    mf->b = b;
+    mf->position = position;
+
+    gs->iMovieLeftFrameCount++;
+
+    return mf;
+}
+
+movieframe *addMFRight(const char r, const char g, const char b, const short position)
+{
+    if (gs->iMovieRightFrameCount == gs->iMovieRightFrameCapacity)
+    {
+        // TODO: define growth size
+        gs->iMovieRightFrameCapacity += 2;
+
+        gs->movieRight = (struct movieframe *)realloc(gs->movieRight, (sizeof(state) * gs->iMovieRightFrameCapacity));
+    }
+
+    movieframe *mf = (gs->movieRight + gs->iMovieRightFrameCount);
+    mf->r = r;
+    mf->g = g;
+    mf->b = b;
+    mf->position = position;
+
+    gs->iMovieRightFrameCount++;
+
+    return mf;
+}
+
+void checkEasterEggMode()
 {
   Serial.println("Checking Easter Egg Mode");
   Serial.print("Left button: ");
-  Serial.print((*globalState).bLeftButtonDown);
+  Serial.print(gs->bLeftButtonDown);
   Serial.print("Right button: ");
-  Serial.println((*globalState).bRightButtonDown);
+  Serial.println(gs->bRightButtonDown);
     
   // if both buttons are down, we either leave or enter the easter egg mode
-  if((*globalState).bLeftButtonDown && (*globalState).bRightButtonDown)  
+  if(gs->bLeftButtonDown && gs->bRightButtonDown)  
   {
     Serial.println("Both buttons down");
-    Serial.println((*globalState).bytCurrentMode != MODE_EASTEREGG ? MODE_EASTEREGG : MODE_IDLE);
+    Serial.println(gs->bytCurrentMode != MODE_EASTEREGG ? MODE_EASTEREGG : MODE_IDLE);
 
-    (*globalState).bytNextMode = (*globalState).bytCurrentMode != MODE_EASTEREGG ? MODE_EASTEREGG : MODE_IDLE;
+    gs->bytNextMode = gs->bytCurrentMode != MODE_EASTEREGG ? MODE_EASTEREGG : MODE_IDLE;
   }
 }
 
-void checkVote(char cVote, state *globalState)
+void checkVote(char cVote)
 {
   Serial.println("Checking Vote");
   
   // if we do not leave nor join the easter egg mode, this is a vote then
-  if((*globalState).bytCurrentMode != MODE_EASTEREGG && (*globalState).bytNextMode != MODE_EASTEREGG)
+  if(gs->bytCurrentMode != MODE_EASTEREGG && gs->bytNextMode != MODE_EASTEREGG)
   {
     Serial.print("Let's vote: ");
     Serial.println(cVote);
   
-    (*globalState).bytNextMode = MODE_VOTE;
-    (*globalState).cVote = cVote;
+    gs->bytNextMode = MODE_VOTE;
+    gs->cVote = cVote;
   }
   else
   {
