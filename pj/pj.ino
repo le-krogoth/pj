@@ -99,17 +99,17 @@ void setupPins()
   pinMode(LED_LEFT_G, OUTPUT);
   pinMode(LED_LEFT_B, OUTPUT);
 
-  digitalWrite(LED_LEFT_R, 0);
-  digitalWrite(LED_LEFT_G, 0);
-  digitalWrite(LED_LEFT_B, 0);
+  analogWrite(LED_LEFT_R, 0);
+  analogWrite(LED_LEFT_G, 0);
+  analogWrite(LED_LEFT_B, 0);
 
   //pinMode(LED_RIGHT_R, OUTPUT);
   //pinMode(LED_RIGHT_G, OUTPUT);
   //pinMode(LED_RIGHT_B, OUTPUT);
 
-  digitalWrite(LED_RIGHT_R, 0);
-  digitalWrite(LED_RIGHT_G, 0);
-  digitalWrite(LED_RIGHT_B, 0);
+  //analogWrite(LED_RIGHT_R, 0);
+  //analogWrite(LED_RIGHT_G, 0);
+  //analogWrite(LED_RIGHT_B, 0);
 
   // analogWrite(pin, value) enables software PWM on the given pin. PWM may be used on pins 0 to 16. 
   // Call analogWrite(pin, 0) to disable PWM on the pin. value may be in range from 0 to PWMRANGE, 

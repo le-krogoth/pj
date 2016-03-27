@@ -189,43 +189,66 @@ void handleIdle()
   }
 }
 
+int getAnalogueValue(char colour)
+{
+  char cHex[2];
+  memset(cHex, 0x00, sizeof(cHex));
+    
+  cHex[0] = colour;
+    
+  int iVal = strtol(cHex, NULL, 16);
+  Serial.print("Converting colour from: ");
+  Serial.print(colour);
+    
+  int iAnalogVal = (iVal * 17);
+  Serial.print(" to ");
+  Serial.println(iAnalogVal);
+
+  return iAnalogVal;
+}
+
 // ------------------------------------------------------------------
 void handleMovie()
 {
   Serial.println("Handle Movie");
 
-   // find out if we have to change colour
-    // for that: run through movie array, check movie.position, change colour when movie.position matches lMoviePosition
-    for(int i = 0; i < gs->iMovieLeftFrameCount; i++)
-    {
-        int iPos = gs->movieLeft[i].position;
-        if(iPos > gs->lMoviePosition)
-        {
-            Serial.println("iPos > lMoviePosition, breaking");
-            break;
-        }
-        else if(iPos == gs->lMoviePosition)
-        {
-            Serial.println("BLINK");
-            Serial.print("Element ");
-            Serial.print(i);
-            Serial.print(" has values R:");
-            Serial.print(gs->movieLeft[i].r);
-            Serial.print(" G:");
-            Serial.print(gs->movieLeft[i].g);
-            Serial.print(" B:");
-            Serial.print(gs->movieLeft[i].b);
-            Serial.print(" at ");
-            Serial.println(gs->movieLeft[i].position);
-            break;
-        }
-        else
-        {
-            Serial.print(".");
-        }
-    }
+  // find out if we have to change colour
+  // for that: run through movie array, check movie.position, change colour when movie.position matches lMoviePosition
+  for(int i = 0; i < gs->iMovieLeftFrameCount; i++)
+  {
+      int iPos = gs->movieLeft[i].position;
+      if(iPos > gs->lMoviePosition)
+      {
+          Serial.println("iPos > lMoviePosition, breaking");
+          break;
+      }
+      else if(iPos == gs->lMoviePosition)
+      {
+          Serial.println("BLINK");
+          Serial.print("Element ");
+          Serial.print(i);
+          Serial.print(" has values R:");
+          Serial.print(gs->movieLeft[i].r);
+          Serial.print(" G:");
+          Serial.print(gs->movieLeft[i].g);
+          Serial.print(" B:");
+          Serial.print(gs->movieLeft[i].b);
+          Serial.print(" at ");
+          Serial.println(gs->movieLeft[i].position);
 
-    Serial.println("");
+          analogWrite(LED_LEFT_R, getAnalogueValue(gs->movieLeft[i].r));
+          analogWrite(LED_LEFT_G, getAnalogueValue(gs->movieLeft[i].g));
+          analogWrite(LED_LEFT_B, getAnalogueValue(gs->movieLeft[i].b));
+          
+          break;
+      }
+      else
+      {
+          Serial.print(".");
+      }
+  }
+
+  Serial.println("");
 
   // continue position to the next
   gs->lMoviePosition++;
@@ -238,6 +261,11 @@ void handleMovie()
     gs->iMovieLeftFrameCount = 0;
     gs->iMovieRightFrameCount = 0;
     gs->lMovieLength = 0;
+
+    // clean LED
+    analogWrite(LED_LEFT_R, 0);
+    analogWrite(LED_LEFT_G, 0);
+    analogWrite(LED_LEFT_B, 0);
     
     // if movie is over, go back to IDLE
     gs->bytNextMode = MODE_IDLE;      
