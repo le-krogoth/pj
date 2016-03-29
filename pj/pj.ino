@@ -66,7 +66,7 @@ void rightPinChanges()
     Serial.println("** Rising wink from right pin.");
     gs->bRightButtonDown = false;
   
-    checkVote('R');
+    checkVote(2);
   }  
 }
 
@@ -85,7 +85,7 @@ void leftPinChanges()
     Serial.println("** Rising wink from left pin.");
     gs->bLeftButtonDown = false;
   
-    checkVote('L');
+    checkVote(1);
   }  
 }
 
@@ -138,30 +138,12 @@ void setup() {
   // set all needed ports and disable unneeded output ports to save power
   setupPins();
 
-  // initialise state
-  // TODO not needed since calloc was used
-  //memset(gs, 0, sizeof(state));
-
-  /*gs = (state) { .ulLoopStartAt = 0,
-                          .ulLastModeChangeAt = 0,
-                          .bytCurrentMode = MODE_INIT, 
-                          .bytNextMode = MODE_NONE,
-                          .movieLeft = { 0 }, 
-                          .movieRight = { 0 },
-                          .lMoviePosition = 0, 
-                          .cVote = (char) 0,
-                          .cLastButtons = (char) 0, 
-                          .shPosLeft = 0, 
-                          .shPosRight = 0, 
-                          .bLeftButtonDown = false, 
-                          .bRightButtonDown = false 
-                        };
-                        */
+  // initialise memory structure (global state)
   gs->ulLoopStartAt = 0;
   gs->ulLastModeChangeAt = 0;
   gs->bytCurrentMode = MODE_INIT; 
   gs->bytNextMode = MODE_NONE;
-  gs->cVote = (char) 0;
+  gs->sVote = 0;
   gs->cLastButtons = (char) 0; 
   gs->shPosLeft = 0;
   gs->shPosRight = 0; 
@@ -205,6 +187,9 @@ void setup() {
   {
     Serial.println("");
     Serial.println("Wifi not available, going to sleep.");
+
+    // todo: blink in a whimpy fashion!
+    
     ESP.deepSleep(1 * 10 * 1000000, WAKE_RF_DEFAULT);
     delay(1000);  
   }
@@ -337,11 +322,21 @@ void loop() {
   
   Serial.println();
   Serial.println("Ending loop");
-  delay(1000);
 
-  // go to deepsleep for 10 seconds
-  //ESP.deepSleep(1 * 10 * 1000000, WAKE_RF_DEFAULT);
-  // delay(1000);
+  // try to have a constant "frame" rate
+  long lDelayTime = 1000 - (millis() - gs->ulLoopStartAt);
+
+  if(lDelayTime > 0)
+  {
+    delay(lDelayTime);
+  }
+  else
+  {
+    delay(100);
+  }
+
+  Serial.print("Delayed for: ");
+  Serial.println(lDelayTime);
 
   Serial.print("Time used: ");
   Serial.println(millis() - gs->ulLoopStartAt);

@@ -68,68 +68,20 @@ void handleUpdateReply(reply r)
     StaticJsonBuffer<200> jsonBuffer;
     JsonObject& root = jsonBuffer.parseObject(r.sReply);
     
-    const char* colour1 = root["colour_1"];
-    const char* colour2 = root["colour_2"];
+    const char* colourLeft = root["colour_1"];
+    const char* colourRight = root["colour_2"];
 
     Serial.print("colour1: ");
-    Serial.println(colour1);
+    Serial.println(colourLeft);
     Serial.print("colour2: ");
-    Serial.println(colour2);
+    Serial.println(colourRight);
 
-    char* cMovie = "F0090F0900F9";
-    
-    int iMovieLength = strlen(cMovie);
-    int iMovieElements = iMovieLength / 4;
-    
-    int pos = 0;
-    short location = 0;
-
-    for(int i = 0; i < iMovieElements; i++)
-    {
-        movieframe *temp;
-
-        temp = addMFLeft(cMovie[pos], cMovie[pos + 1], cMovie[pos + 2], location);
-
-        location += (cMovie[pos + 3] - '0');
-
-        pos += 4;
-    }
-
-    delay(10);
-    
-    Serial.println("Movie file was parsed like that:");
-    for(int i = 0; i < gs->iMovieLeftFrameCount; i++)
-    {
-        Serial.print("Element ");
-        Serial.print(i);
-        Serial.print(" has values R:");
-        Serial.print(gs->movieLeft[i].r);
-        Serial.print(" G:");
-        Serial.print(gs->movieLeft[i].g);
-        Serial.print(" B:");
-        Serial.print(gs->movieLeft[i].b);
-        Serial.print(" at ");
-        Serial.println(gs->movieLeft[i].position);
-    }
-
-    Serial.print("iMovieLeftFrameCapacity: ");
-    Serial.println(gs->iMovieLeftFrameCapacity);
-    
-    Serial.print("MovieLeftFrameCount: ");
-    Serial.println(gs->iMovieLeftFrameCount);
-
-    gs->lMovieLength = gs->iMovieLeftFrameCount > gs->iMovieRightFrameCount ? gs->iMovieLeftFrameCount : gs->iMovieRightFrameCount;
-
-    gs->lMoviePosition = 0;
-    gs->bytNextMode = MODE_MOVIE;
-
-    Serial.println("Leaving handling function.");
-
+    loadMovie(colourLeft, colourRight);
   }
   else
   {
     Serial.println("JSON seems not to be valid.");
-    gs->bytNextMode = MODE_IDLE;
+    loadMovieFailed();
   }
 }
 
@@ -144,12 +96,10 @@ void handleVoteReply(reply r)
     // tell user that it worked
     // 
     loadMovieSucceeded();
-    gs->bytNextMode = MODE_IDLE;
   }
   else
   {
-    loadMovieFailed();    
-    gs->bytNextMode = MODE_IDLE;
+    loadMovieFailed();
   }
 }
 
@@ -277,10 +227,12 @@ void handleMovie()
 // ------------------------------------------------------------------
 void handleUpdate()
 {
-  Serial.println("Handle Update");
+  Serial.print("Handle Update: ");
   
   // ask HARDAC for status and actions
   String sUrl = "/" + sPJDeviceId + "/s/";
+  Serial.println(sUrl);
+
   reply r = callUrl(sUrl);
 
   handleUpdateReply(r);
@@ -289,12 +241,14 @@ void handleUpdate()
 // ------------------------------------------------------------------
 void handleVote()
 {
-  Serial.println("Handle Vote");
+  Serial.print("Handle Vote: ");
   
   // send ballot to HARDAC
   // /{device_id}/v/{ballot}
   
-  String sUrl = "/" + sPJDeviceId + "/v/" + gs->cVote + "/";
+  String sUrl = "/" + sPJDeviceId + "/v/" + gs->sVote + "/";
+  Serial.println(sUrl);
+  
   reply r = callUrl(sUrl);
 
   handleVoteReply(r);

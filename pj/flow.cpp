@@ -46,7 +46,7 @@ void checkEasterEggMode()
   }
 }
 
-void checkVote(char cVote)
+void checkVote(short sVote)
 {
   Serial.println("Checking Vote");
   
@@ -54,10 +54,10 @@ void checkVote(char cVote)
   if(gs->bytCurrentMode != MODE_EASTEREGG && gs->bytNextMode != MODE_EASTEREGG)
   {
     Serial.print("Let's vote: ");
-    Serial.println(cVote);
+    Serial.println(sVote);
   
     gs->bytNextMode = MODE_VOTE;
-    gs->cVote = cVote;
+    gs->sVote = sVote;
   }
   else
   {

@@ -64,7 +64,7 @@ typedef struct state
   movieframe *movieRight;
   long lMoviePosition;
   long lMovieLength;
-  char cVote;
+  short sVote;
   char* cLastButtons;
   short shPosLeft;
   short shPosRight;
@@ -75,6 +75,6 @@ typedef struct state
 extern state *gs;
 
 void checkEasterEggMode();
-void checkVote(char cVote);
+void checkVote(short sVote);
 
 #endif // H_FLOW

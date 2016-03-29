@@ -30,17 +30,110 @@
 
 void loadMovieFailed()
 {
-  loadMovie("F0020002F0020002F0020002"); 
+  loadMovie("F0020002F0020002F0020002", "F0020002F0020002F0020002"); 
 }
 
 void loadMovieSucceeded()
 {
-  loadMovie("0F0200020F0200020F020002");
+  loadMovie("0F0200020F0200020F020002", "0F0200020F0200020F020002");
 }
 
-void loadMovie(char* movie)
+void loadMovie(const char* movieLeft, const char* movieRight)
 {
+    int iMovieLeftLength = strlen(movieLeft);
+    int iMovieLeftElements = iMovieLeftLength / 4;
+    
+    int pos = 0;
+    short location = 0;
+
+    for(int i = 0; i < iMovieLeftElements; i++)
+    {
+        movieframe *temp;
+
+        temp = addMFLeft(movieLeft[pos], movieLeft[pos + 1], movieLeft[pos + 2], location);
+
+        location += (movieLeft[pos + 3] - '0');
+
+        pos += 4;
+    }
+
+    delay(10);
+
+    int iMovieRightLength = strlen(movieRight);
+    int iMovieRightElements = iMovieRightLength / 4;
+    
+    pos = 0;
+    location = 0;
+
+    for(int i = 0; i < iMovieRightElements; i++)
+    {
+        movieframe *temp;
+
+        temp = addMFRight(movieRight[pos], movieRight[pos + 1], movieRight[pos + 2], location);
+
+        location += (movieRight[pos + 3] - '0');
+
+        pos += 4;
+    }
+
+    delay(10);
+
+    // have parsed movie printed to the serial console
+    serialPrintMovieParsed();
+
+    delay(10);
+
+    // calculate length of whole movie, take bigger number
+    gs->lMovieLength = gs->iMovieLeftFrameCount > gs->iMovieRightFrameCount ? gs->iMovieLeftFrameCount : gs->iMovieRightFrameCount;
+
+    // reset movie to start position
+    gs->lMoviePosition = 0;
+    gs->bytNextMode = MODE_MOVIE;
+}
+
+void serialPrintMovieParsed()
+{
+  Serial.println("Left Movie file was parsed like that:");
+  for(int i = 0; i < gs->iMovieLeftFrameCount; i++)
+  {
+      Serial.print("Element ");
+      Serial.print(i);
+      Serial.print(" has values R:");
+      Serial.print(gs->movieLeft[i].r);
+      Serial.print(" G:");
+      Serial.print(gs->movieLeft[i].g);
+      Serial.print(" B:");
+      Serial.print(gs->movieLeft[i].b);
+      Serial.print(" at ");
+      Serial.println(gs->movieLeft[i].position);
+  }
+
+  Serial.print("iMovieLeftFrameCapacity: ");
+  Serial.println(gs->iMovieLeftFrameCapacity);
   
+  Serial.print("MovieLeftFrameCount: ");
+  Serial.println(gs->iMovieLeftFrameCount);
+
+  Serial.println("Right Movie file was parsed like that:");
+  for(int i = 0; i < gs->iMovieRightFrameCount; i++)
+  {
+      Serial.print("Element ");
+      Serial.print(i);
+      Serial.print(" has values R:");
+      Serial.print(gs->movieRight[i].r);
+      Serial.print(" G:");
+      Serial.print(gs->movieRight[i].g);
+      Serial.print(" B:");
+      Serial.print(gs->movieRight[i].b);
+      Serial.print(" at ");
+      Serial.println(gs->movieRight[i].position);
+  }
+
+  Serial.print("iMovieRightFrameCapacity: ");
+  Serial.println(gs->iMovieRightFrameCapacity);
+  
+  Serial.print("MovieRightFrameCount: ");
+  Serial.println(gs->iMovieRightFrameCount);
 }
 
 
