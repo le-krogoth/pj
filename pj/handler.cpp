@@ -26,6 +26,7 @@
 */
 #include "handler.h"
 #include "flow.h"
+#include "moviehelper.h"
 #include "comm.h"
 #include "global.h"
 #include <ESP8266WiFi.h>
@@ -142,11 +143,12 @@ void handleVoteReply(reply r)
   {
     // tell user that it worked
     // 
+    loadMovieSucceeded();
     gs->bytNextMode = MODE_IDLE;
   }
   else
   {
-    Serial.println("JSON seems not to be valid.");
+    loadMovieFailed();    
     gs->bytNextMode = MODE_IDLE;
   }
 }

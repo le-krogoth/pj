@@ -74,8 +74,6 @@ typedef struct state
 
 extern state *gs;
 
-movieframe *addMFLeft(const char r, const char g, const char b, const short position);
-movieframe *addMFRight(const char r, const char g, const char b, const short position);
 void checkEasterEggMode();
 void checkVote(char cVote);
 

@@ -28,48 +28,6 @@
 #include "global.h"
 #include <ESP8266WiFi.h>
 
-movieframe *addMFLeft(const char r, const char g, const char b, const short position)
-{
-    if (gs->iMovieLeftFrameCount == gs->iMovieLeftFrameCapacity)
-    {
-        // TODO: define growth size
-        gs->iMovieLeftFrameCapacity += 2;
-
-        gs->movieLeft = (struct movieframe *)realloc(gs->movieLeft, sizeof(state) * gs->iMovieLeftFrameCapacity);
-    }
-
-    movieframe *mf = (gs->movieLeft + gs->iMovieLeftFrameCount);
-    mf->r = r;
-    mf->g = g;
-    mf->b = b;
-    mf->position = position;
-
-    gs->iMovieLeftFrameCount++;
-
-    return mf;
-}
-
-movieframe *addMFRight(const char r, const char g, const char b, const short position)
-{
-    if (gs->iMovieRightFrameCount == gs->iMovieRightFrameCapacity)
-    {
-        // TODO: define growth size
-        gs->iMovieRightFrameCapacity += 2;
-
-        gs->movieRight = (struct movieframe *)realloc(gs->movieRight, (sizeof(state) * gs->iMovieRightFrameCapacity));
-    }
-
-    movieframe *mf = (gs->movieRight + gs->iMovieRightFrameCount);
-    mf->r = r;
-    mf->g = g;
-    mf->b = b;
-    mf->position = position;
-
-    gs->iMovieRightFrameCount++;
-
-    return mf;
-}
-
 void checkEasterEggMode()
 {
   Serial.println("Checking Easter Egg Mode");
