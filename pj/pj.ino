@@ -335,6 +335,9 @@ void loop() {
     delay(100);
   }
 
+  Serial.print("Free heap:");
+  Serial.println(ESP.getFreeHeap(),DEC);
+
   Serial.print("Delayed for: ");
   Serial.println(lDelayTime);
 

@@ -196,7 +196,7 @@ void handleMovie()
       }
       else
       {
-          Serial.print(".");
+          //Serial.print(".");
       }
   }
 
