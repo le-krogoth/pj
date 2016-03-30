@@ -44,15 +44,15 @@ void loadMovie(const char* movieLeft, const char* movieRight)
     int iMovieLeftElements = iMovieLeftLength / 4;
     
     int pos = 0;
-    short location = 0;
+    int iLocationLeft = 0;
 
     for(int i = 0; i < iMovieLeftElements; i++)
     {
         movieframe *temp;
 
-        temp = addMFLeft(movieLeft[pos], movieLeft[pos + 1], movieLeft[pos + 2], location);
+        temp = addMFLeft(movieLeft[pos], movieLeft[pos + 1], movieLeft[pos + 2], iLocationLeft);
 
-        location += (movieLeft[pos + 3] - '0');
+        iLocationLeft += (movieLeft[pos + 3] - '0');
 
         pos += 4;
     }
@@ -63,15 +63,15 @@ void loadMovie(const char* movieLeft, const char* movieRight)
     int iMovieRightElements = iMovieRightLength / 4;
     
     pos = 0;
-    location = 0;
+    int iLocationRight = 0;
 
     for(int i = 0; i < iMovieRightElements; i++)
     {
         movieframe *temp;
 
-        temp = addMFRight(movieRight[pos], movieRight[pos + 1], movieRight[pos + 2], location);
+        temp = addMFRight(movieRight[pos], movieRight[pos + 1], movieRight[pos + 2], iLocationRight);
 
-        location += (movieRight[pos + 3] - '0');
+        iLocationRight += (movieRight[pos + 3] - '0');
 
         pos += 4;
     }
@@ -84,7 +84,10 @@ void loadMovie(const char* movieLeft, const char* movieRight)
     delay(10);
 
     // calculate length of whole movie, take bigger number
-    gs->lMovieLength = gs->iMovieLeftFrameCount > gs->iMovieRightFrameCount ? gs->iMovieLeftFrameCount : gs->iMovieRightFrameCount;
+    gs->lMovieLength = iLocationLeft > iLocationRight ? iLocationLeft : iLocationRight;
+
+    Serial.print("Movielength: ");
+    Serial.println(gs->lMovieLength);
 
     // reset movie to start position
     gs->lMoviePosition = 0;
