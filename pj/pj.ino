@@ -145,8 +145,7 @@ void setup() {
   gs->bytNextMode = MODE_NONE;
   gs->sVote = 0;
   gs->cLastButtons = (char) 0; 
-  gs->shPosLeft = 0;
-  gs->shPosRight = 0; 
+  gs->iCycleLength = 1000;
   gs->bLeftButtonDown = false; 
   gs->bRightButtonDown = false; 
 
@@ -324,7 +323,7 @@ void loop() {
   Serial.println("Ending loop");
 
   // try to have a constant "frame" rate
-  long lDelayTime = 1000 - (millis() - gs->ulLoopStartAt);
+  long lDelayTime = gs->iCycleLength - (millis() - gs->ulLoopStartAt);
 
   if(lDelayTime > 0)
   {
@@ -336,7 +335,7 @@ void loop() {
   }
 
   Serial.print("Free heap:");
-  Serial.println(ESP.getFreeHeap(),DEC);
+  Serial.println(ESP.getFreeHeap(), DEC);
 
   Serial.print("Delayed for: ");
   Serial.println(lDelayTime);

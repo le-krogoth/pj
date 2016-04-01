@@ -62,19 +62,27 @@ void handleUpdateReply(reply r)
     break;
   }
 
-  // { "colour_1": "R", "colour_2": "B", "idle_time": "cycles?" }
+  // { "colour_1": "F0020F0200F20002100120013001400150016001700180019001A001B001C001D001E001F001", "colour_2": "0F0200020F0200020F020002", "cycle_length": "1000" }
   if(r.iStatusCd != 0 && r.sReply.length() > 24)
   {
-    StaticJsonBuffer<200> jsonBuffer;
+    // TODO: evaluate if we should switch to dynamic json buffer...
+    // Free heap:43648
+    StaticJsonBuffer<4096> jsonBuffer;
+    //DynamicJsonBuffer jsonBuffer;
     JsonObject& root = jsonBuffer.parseObject(r.sReply);
     
     const char* colourLeft = root["colour_1"];
     const char* colourRight = root["colour_2"];
 
+    // the possibility to define how long a cycle is
+    gs->iCycleLength = root["cycle_length"];
+
     Serial.print("colour1: ");
     Serial.println(colourLeft);
     Serial.print("colour2: ");
     Serial.println(colourRight);
+    Serial.print("cycle_length: ");
+    Serial.println(gs->iCycleLength);
 
     loadMovie(colourLeft, colourRight);
   }

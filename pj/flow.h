@@ -65,9 +65,8 @@ typedef struct state
   long lMoviePosition;
   long lMovieLength;
   short sVote;
+  int iCycleLength;
   char* cLastButtons;
-  short shPosLeft;
-  short shPosRight;
   bool bLeftButtonDown;
   bool bRightButtonDown;
 } state;
