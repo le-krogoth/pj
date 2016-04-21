@@ -46,7 +46,7 @@ typedef struct movieframe
     char r;
     char g;
     char b;
-    short position;
+    int position;
 } movieframe;
 
 // state structure for state machine

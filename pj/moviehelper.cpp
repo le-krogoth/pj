@@ -40,6 +40,8 @@ void loadMovieSucceeded()
 
 void loadMovie(const char* movieLeft, const char* movieRight)
 {
+  Serial.println("loadingMovies");
+    
     int iMovieLeftLength = strlen(movieLeft);
     int iMovieLeftElements = iMovieLeftLength / 4;
     
@@ -52,7 +54,7 @@ void loadMovie(const char* movieLeft, const char* movieRight)
 
         temp = addMFLeft(movieLeft[pos], movieLeft[pos + 1], movieLeft[pos + 2], iLocationLeft);
 
-        iLocationLeft += (movieLeft[pos + 3] - '0');
+        iLocationLeft += (getAnalogueValue(movieLeft[pos + 3]));
 
         pos += 4;
     }
@@ -71,7 +73,7 @@ void loadMovie(const char* movieLeft, const char* movieRight)
 
         temp = addMFRight(movieRight[pos], movieRight[pos + 1], movieRight[pos + 2], iLocationRight);
 
-        iLocationRight += (movieRight[pos + 3] - '0');
+        iLocationRight += (getAnalogueValue(movieRight[pos + 3]));
 
         pos += 4;
     }
@@ -140,7 +142,7 @@ void serialPrintMovieParsed()
 }
 
 
-movieframe *addMFLeft(const char r, const char g, const char b, const short position)
+movieframe *addMFLeft(const char r, const char g, const char b, const int position)
 {
     if (gs->iMovieLeftFrameCount == gs->iMovieLeftFrameCapacity)
     {
@@ -161,7 +163,7 @@ movieframe *addMFLeft(const char r, const char g, const char b, const short posi
     return mf;
 }
 
-movieframe *addMFRight(const char r, const char g, const char b, const short position)
+movieframe *addMFRight(const char r, const char g, const char b, const int position)
 {
     if (gs->iMovieRightFrameCount == gs->iMovieRightFrameCapacity)
     {
@@ -180,4 +182,22 @@ movieframe *addMFRight(const char r, const char g, const char b, const short pos
     gs->iMovieRightFrameCount++;
 
     return mf;
+}
+
+int getAnalogueValue(char colour)
+{
+  char cHex[2];
+  memset(cHex, 0x00, sizeof(cHex));
+    
+  cHex[0] = colour;
+    
+  int iVal = strtol(cHex, NULL, 16);
+  Serial.print("Converting colour from: ");
+  Serial.print(colour);
+    
+  int iAnalogVal = (iVal * 17);
+  Serial.print(" to ");
+  Serial.println(iAnalogVal);
+
+  return iAnalogVal;
 }

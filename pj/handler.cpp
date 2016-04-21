@@ -67,15 +67,22 @@ void handleUpdateReply(reply r)
   {
     // TODO: evaluate if we should switch to dynamic json buffer...
     // Free heap:43648
-    StaticJsonBuffer<4096> jsonBuffer;
-    //DynamicJsonBuffer jsonBuffer;
-    JsonObject& root = jsonBuffer.parseObject(r.sReply);
+    //StaticJsonBuffer<4096> jsonBuffer;
+    DynamicJsonBuffer jsonBuffer;
+    Serial.println("JSON Buffer allocated");
     
+    JsonObject& root = jsonBuffer.parseObject(r.sReply);
+    Serial.println("JSON Object parsed");
+
     const char* colourLeft = root["colour_1"];
+    Serial.println("colour_1 read");
+
     const char* colourRight = root["colour_2"];
+    Serial.println("colour_2 read");
 
     // the possibility to define how long a cycle is
     gs->iCycleLength = root["cycle_length"];
+    Serial.println("cycle_length read");
 
     Serial.print("colour1: ");
     Serial.println(colourLeft);
@@ -147,24 +154,6 @@ void handleIdle()
     // if enough time passed, go into UPDATE mode
     gs->bytNextMode = MODE_UPDATE;
   }
-}
-
-int getAnalogueValue(char colour)
-{
-  char cHex[2];
-  memset(cHex, 0x00, sizeof(cHex));
-    
-  cHex[0] = colour;
-    
-  int iVal = strtol(cHex, NULL, 16);
-  Serial.print("Converting colour from: ");
-  Serial.print(colour);
-    
-  int iAnalogVal = (iVal * 17);
-  Serial.print(" to ");
-  Serial.println(iAnalogVal);
-
-  return iAnalogVal;
 }
 
 // ------------------------------------------------------------------

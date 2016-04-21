@@ -34,11 +34,13 @@ void loadMovieFailed();
 void loadMovieSucceeded();
 void loadMovie(const char* movieLeft, const char* movieRight);
 
+int getAnalogueValue(char colour);
+
 // internal use only
 void serialPrintMovieParsed();
 
 // internal use only
-movieframe *addMFLeft(const char r, const char g, const char b, const short position);
-movieframe *addMFRight(const char r, const char g, const char b, const short position);
+movieframe *addMFLeft(const char r, const char g, const char b, const int position);
+movieframe *addMFRight(const char r, const char g, const char b, const int position);
 
 #endif // H_MOVIEHELPER

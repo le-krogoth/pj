@@ -260,8 +260,9 @@ void loop() {
   Serial.println("Modes");
   Serial.print("- Current Mode: ");
   Serial.println(gs->bytCurrentMode);
-  Serial.print("- Next Mode: ");
-  Serial.println(gs->bytNextMode);
+  // we will see if mode gets switched
+  //Serial.print("- Next Mode: ");
+  //Serial.println(gs->bytNextMode);
 
   // enable wifi if next mode needs it and current has not active already
   if((gs->bytCurrentMode != MODE_VOTE && gs->bytCurrentMode != MODE_UPDATE)
@@ -279,7 +280,10 @@ void loop() {
   // switch modes?
   if(gs->bytNextMode != MODE_NONE)
   {
-    Serial.println("Switching modes");
+    Serial.print("Switching modes, because ");
+    Serial.print(gs->bytNextMode);
+    Serial.print(" is not ");
+    Serial.println(MODE_NONE);
 
     gs->ulLastModeChangeAt = millis();
 
@@ -287,10 +291,11 @@ void loop() {
     gs->bytCurrentMode = gs->bytNextMode;
     gs->bytNextMode = MODE_NONE;
 
-    Serial.print("- Current Mode: ");
+    Serial.print("- New Mode: ");
     Serial.println(gs->bytCurrentMode);
-    Serial.print("- Next Mode: ");
-    Serial.println(gs->bytNextMode);
+    // makes no sense, is always NONE
+    //Serial.print("- Next Mode: ");
+    //Serial.println(gs->bytNextMode);
   }
 
   switch(gs->bytCurrentMode)
