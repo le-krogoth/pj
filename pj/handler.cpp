@@ -32,6 +32,16 @@
 #include <ESP8266WiFi.h>
 
 // ------------------------------------------------------------------
+void printWIFIStrength()
+{
+  Serial.print("My IP is: ");
+  Serial.print(WiFi.localIP());
+  Serial.print("Signal strength (RSSI):");
+  Serial.print(WiFi.RSSI());
+  Serial.println(" dBm");
+}
+
+// ------------------------------------------------------------------
 void handleUpdateReply(reply r)
 {
   Serial.println("");
@@ -62,41 +72,47 @@ void handleUpdateReply(reply r)
     break;
   }
 
-  // { "colour_1": "F0020F0200F20002100120013001400150016001700180019001A001B001C001D001E001F001", "colour_2": "0F0200020F0200020F020002", "cycle_length": "1000" }
+  // { "m1": "F0020002F0020002F0020002", "m2": "0F0200020F0200020F020002", "mrc": "0", "cl": "1000" }
+  // m1: movie 1, m2: movie 2, mrc: movie replay count, cl: cycle length
   if(r.iStatusCd != 0 && r.sReply.length() > 24)
   {
-    // TODO: evaluate if we should switch to dynamic json buffer...
-    // Free heap:43648
-    //StaticJsonBuffer<4096> jsonBuffer;
     DynamicJsonBuffer jsonBuffer;
     Serial.println("JSON Buffer allocated");
     
     JsonObject& root = jsonBuffer.parseObject(r.sReply);
     Serial.println("JSON Object parsed");
 
-    const char* colourLeft = root["colour_1"];
-    Serial.println("colour_1 read");
+    const char* colourLeft = root["m1"];
+    Serial.println("m1 read");
 
-    const char* colourRight = root["colour_2"];
-    Serial.println("colour_2 read");
+    const char* colourRight = root["m2"];
+    Serial.println("m2 read");
+
+    // Movie replay count. 0 for endless
+    const short mrc = root["mrc"];
+    gs->sMovieReplayCount = mrc;
+    Serial.println("mrc read");
 
     // the possibility to define how long a cycle is
-    gs->iCycleLength = root["cycle_length"];
-    Serial.println("cycle_length read");
+    gs->iCycleLength = root["cl"];
+    Serial.println("cl read");
 
-    Serial.print("colour1: ");
+    Serial.print("m1: ");
     Serial.println(colourLeft);
-    Serial.print("colour2: ");
+    Serial.print("m2: ");
     Serial.println(colourRight);
-    Serial.print("cycle_length: ");
+    Serial.print("mrc: ");
+    Serial.println(gs->sMovieReplayCount);
+    Serial.print("cl: ");
     Serial.println(gs->iCycleLength);
 
+    playSuccess();
     loadMovie(colourLeft, colourRight);
   }
   else
   {
+    playError();
     Serial.println("JSON seems not to be valid.");
-    loadMovieFailed();
   }
 }
 
@@ -108,124 +124,277 @@ void handleVoteReply(reply r)
       
   if(r.iStatusCd == 202)
   {
-    // tell user that it worked
-    // 
-    loadMovieSucceeded();
+    playSuccess();
+    Serial.println(" Vote sent successfully");
+    gs->sVote = 0;
   }
   else
   {
-    loadMovieFailed();
+    playError();
+    Serial.println(" Vote send failed");
   }
 }
 
 // ------------------------------------------------------------------
-void handleEasterEgg()
+void handleInput()
 {
-  Serial.println("Handle Easter Egg");
+  Serial.print(" - handleEasterEgg() -> ");
+  Serial.println(gs->ulEgg);
   
-  unsigned long lTestLoop = millis();
-  bool bOn = true;
-  while (lTestLoop + 20000 > millis()) 
-  {
-    if(bOn)
-    {    
-      digitalWrite(LED_LEFT_R, 20);
-      digitalWrite(LED_LEFT_B, 200);
-    }
-    else
-    {
-      digitalWrite(LED_LEFT_R, 0);
-      digitalWrite(LED_LEFT_B, 0);
-    }
+  // check buttons for easteregg mode - enter if both buttons are down
+  // Interrupts are a bit fluky sometimes, so we clear buttons in here instead of raising interrupt
 
-    bOn = !bOn;
-    delay(500);
-    Serial.print(bOn);
-  }  
+  if (gs->bLeftButtonDown && gs->bRightButtonDown)
+  {
+    if (gs->bytCurrentMode != MODE_EASTEREGG)
+    {
+      // go directly into easter egg mode
+      gs->bytCurrentMode = MODE_EASTEREGG;
+      gs->ulEgg = 0;
+
+    } 
+    else
+    {     
+      // leave easter egg mode as both buttons are pressed
+      gs->bytCurrentMode = MODE_IDLE;
+      gs->sVote = 0;
+      playWarning();
+    }
+    
+    // clear buttons
+    gs->bLeftButtonDown = false;
+    gs->bRightButtonDown = false;
+  }
+
+// check left button
+  if (gs->bLeftButtonDown)
+  {
+    if (gs->bytCurrentMode == MODE_EASTEREGG)
+    {
+      //add left button to easter egg hunt
+      gs->ulEgg = gs->ulEgg * 10 + 2; //left shift +2
+    }
+    
+    // clear button as it has been handled
+    gs->bLeftButtonDown = false;
+  }
+
+  // check right button
+  if (gs->bRightButtonDown)
+  {
+    if (gs->bytCurrentMode == MODE_EASTEREGG)
+    {
+      //add right button to easer egg hunt
+      gs->ulEgg = gs->ulEgg * 10 + 3; //left shift +3
+    }
+    
+    // clear button as it has been handled
+    gs->bRightButtonDown = false;
+  }
+
+  // check for winning code
+  Serial.print(" the current egg is:");
+  Serial.println(gs->ulEgg);
+
+  bool foundsomething = false;
+
+  //set new default movie & blink
+  switch(gs->ulEgg)
+  {
+    case EGG_CODE_1:
+      foundsomething = true;
+      playStockMovie(1);
+    break;
+    case EGG_CODE_2:
+      foundsomething = true;
+      playStockMovie(2);
+    break;
+    case EGG_CODE_3:
+      foundsomething = true;
+      playStockMovie(3);
+    break;
+  }
+
+  if(foundsomething == true)
+  {
+      Serial.println(" ### WIN ###");
+      playSuccess();
+      gs->sMovieReplayCount = 0;
+      gs->ulEgg = 0;
+      gs->bytCurrentMode = MODE_IDLE;
+
+      // cheat, else go go directly into an update and overwrite the movie
+      gs->ulLastModeUpdateAt = millis();
+  }
+
+  // reset if it got too big (4.294.967.295)
+  if(gs->ulEgg > 99999999)
+  {
+    Serial.println("resetting easter egg hunter string");
+    gs->ulEgg = 0;
+
+    //blink for reset
+    playWarning();
+   }
 }
 
 // ------------------------------------------------------------------
 void handleIdle()
 {
-  
-  if(millis() - gs->ulLastModeChangeAt >= (IDLE_MODE_LOOP_TIME * SECONDS_TO_MILLIS) )
+  if(millis() - gs->ulLastModeUpdateAt >= (IDLE_MODE_LOOP_TIME * SECONDS_TO_MILLIS) )
   {
-    Serial.println("Changing from idle to update");
+    Serial.println("Changing from IDLE -> UPDATE due to time");
     // if enough time passed, go into UPDATE mode
-    gs->bytNextMode = MODE_UPDATE;
+    gs->bytCurrentMode = MODE_UPDATE;
   }
 }
 
 // ------------------------------------------------------------------
 void handleMovie()
 {
-  Serial.println("Handle Movie");
+  Serial.print("Handle Movie at position: ");
+  Serial.println(gs->lMoviePosition);
 
   // find out if we have to change colour
   // for that: run through movie array, check movie.position, change colour when movie.position matches lMoviePosition
   for(int i = 0; i < gs->iMovieLeftFrameCount; i++)
   {
-      int iPos = gs->movieLeft[i].position;
-      if(iPos > gs->lMoviePosition)
-      {
-          Serial.println("iPos > lMoviePosition, breaking");
-          break;
-      }
-      else if(iPos == gs->lMoviePosition)
-      {
-          Serial.println("BLINK");
-          Serial.print("Element ");
-          Serial.print(i);
-          Serial.print(" has values R:");
-          Serial.print(gs->movieLeft[i].r);
-          Serial.print(" G:");
-          Serial.print(gs->movieLeft[i].g);
-          Serial.print(" B:");
-          Serial.print(gs->movieLeft[i].b);
-          Serial.print(" at ");
-          Serial.println(gs->movieLeft[i].position);
+    int iPos = gs->movieLeft[i].position;
+    if(iPos > gs->lMoviePosition)
+    {
+      Serial.println("iPos_Left > lMoviePosition, breaking");
+      break; // for
+    }
+    else if(iPos == gs->lMoviePosition)
+    {
+      Serial.println("* BLINK LEFT *");
+      Serial.print("  Element ");
+      Serial.print(i);
+      Serial.print(" has values R:");
+      Serial.print(gs->movieLeft[i].r);
+      Serial.print(" G:");
+      Serial.print(gs->movieLeft[i].g);
+      Serial.print(" B:");
+      Serial.print(gs->movieLeft[i].b);
+      Serial.print(" at position ");
+      Serial.println(gs->movieLeft[i].position);
 
-          analogWrite(LED_LEFT_R, getAnalogueValue(gs->movieLeft[i].r));
-          analogWrite(LED_LEFT_G, getAnalogueValue(gs->movieLeft[i].g));
-          analogWrite(LED_LEFT_B, getAnalogueValue(gs->movieLeft[i].b));
-          
-          break;
-      }
-      else
-      {
-          //Serial.print(".");
-      }
+      analogWrite(LED_LEFT_R, 255 - convert2AnalogueValue(gs->movieLeft[i].r));
+      analogWrite(LED_LEFT_G, 255 - convert2AnalogueValue(gs->movieLeft[i].g));
+      analogWrite(LED_LEFT_B, 255 - convert2AnalogueValue(gs->movieLeft[i].b));
+
+      break;
+    }
+    else
+    {
+      //Serial.print(".");
+    }
   }
 
-  Serial.println("");
+  delay(10);
+  //right
+    for(int i = 0; i < gs->iMovieRightFrameCount; i++)
+    {
+        int iPos = gs->movieRight[i].position;
+        if(iPos > gs->lMoviePosition)
+        {
+            Serial.println("iPos_Right > lMoviePosition, breaking");
+            break;
+        }
+        else if(iPos == gs->lMoviePosition)
+        {
+            Serial.println("* BLINK RIGHT *");
+            Serial.print("  Element ");
+            Serial.print(i);
+            Serial.print(" has values R:");
+            Serial.print(gs->movieRight[i].r);
+            Serial.print(" G:");
+            Serial.print(gs->movieRight[i].g);
+            Serial.print(" B:");
+            Serial.print(gs->movieRight[i].b);
+            Serial.print(" at position ");
+            Serial.println(gs->movieRight[i].position);
+
+            //inverted LED intensity 255-
+            analogWrite(LED_RIGHT_R, 255 - convert2AnalogueValue(gs->movieRight[i].r));
+            analogWrite(LED_RIGHT_G, 255 - convert2AnalogueValue(gs->movieRight[i].g));
+            analogWrite(LED_RIGHT_B, 255 - convert2AnalogueValue(gs->movieRight[i].b));
+
+            break;
+        }
+
+    }
+
+    delay(10);
+    Serial.println("");
 
   // continue position to the next
   gs->lMoviePosition++;
 
-  // if the movie is over, clean up and leave this mode
+  // if the movie is over, clean up and reset to beginning of movie (endless loop)
   if(gs->lMoviePosition >= gs->lMovieLength)
   {
     // TODO: fix memory allocation here?
     gs->lMoviePosition = 0;
-    gs->iMovieLeftFrameCount = 0;
-    gs->iMovieRightFrameCount = 0;
-    gs->lMovieLength = 0;
 
-    // clean LED
-    analogWrite(LED_LEFT_R, 0);
-    analogWrite(LED_LEFT_G, 0);
-    analogWrite(LED_LEFT_B, 0);
-    
-    // if movie is over, go back to IDLE
-    gs->bytNextMode = MODE_IDLE;      
+    if (gs->sMovieReplayCount == 1)
+    {
+      // we played the movie as long as requested, lets revert to the default one
+      Serial.println("Switching movie because replay count done");
+      playStockMovie(gs->sStockMovieActiveIndex);
+    }
+
+    if (gs->sMovieReplayCount > 0)
+    {
+        gs->sMovieReplayCount--;
+    }
   }
 }
 
 // ------------------------------------------------------------------
-void handleUpdate()
+void goOnline()
 {
   Serial.print("Handle Update: ");
-  
+
+  // this is the only function that needs Wifi
+  // Wakeup Wifi, WiFi.forceSleepWake(); didnt bring too much saving
+  if(WiFi.status() != WL_CONNECTED)
+  {
+    Serial.println(" #-# starting wifi #-#");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(SSID, PWD);
+    delay(10);
+   }
+
+  // wait till connection is up
+  unsigned long lStart = millis();
+  while (WiFi.status() != WL_CONNECTED && lStart + (10 * SECONDS_TO_MILLIS) > millis())
+  {
+      delay(500);
+      Serial.print(".");
+  }
+  // now it should be up, print status of wifi
+  printWIFIStrength();
+
+  handleUpdate();
+
+  delay(10);
+  //also handleVote now, if there is one
+  if (gs->sVote != EMPTY_VOTE)
+  {
+    handleVote();
+  }
+
+    // shutdown wifi here, disconnect client to save power
+  Serial.println(" #-# shutting down Wifi #-# ");
+  WiFi.disconnect();
+  delay(100);
+  WiFi.mode(WIFI_OFF);
+  delay(100);
+}
+
+void handleUpdate()
+{
   // ask HARDAC for status and actions
   String sUrl = "/" + sPJDeviceId + "/s/";
   Serial.println(sUrl);

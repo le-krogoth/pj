@@ -32,6 +32,7 @@
 #include "flow.h"
 #include "comm.h"
 #include "handler.h"
+#include "moviehelper.h"
 
 // ESP8266 SDK headers are in C, they need to be included externally or else 
 // they will throw an error compiling/linking.
@@ -54,73 +55,81 @@ state *gs = (state *)calloc(1, sizeof(state));
 // ------------------------------------------------------------------
 void rightPinChanges()
 {
+  Serial.println(" - rightPinChanges() - ");
+  // no delay functions allowed in here!
+  //remember when the last button was changed for voting
+  gs->ulLastButtonChangeAt = millis();
   if(digitalRead(RIGHT_BUTTON) == LOW)
   {
     Serial.println("** Falling wink from right pin.");
     gs->bRightButtonDown = true;
-  
-    checkEasterEggMode();
+    gs->sVote=2;
+    //do a short blink, delayMicroseconds works, but its blocking!
+    digitalWrite(LED_RIGHT_B, LOW);
+    delayMicroseconds(1000);
+    digitalWrite(LED_RIGHT_B, HIGH);
   }
-  else
-  {
-    Serial.println("** Rising wink from right pin.");
-    gs->bRightButtonDown = false;
-  
-    checkVote(2);
-  }  
 }
 
 // ------------------------------------------------------------------
 void leftPinChanges()
 {
-  if(digitalRead(RIGHT_BUTTON) == LOW)
+  Serial.println(" - leftPinChanges() - ");
+  // no delay functions allowed in here!
+  //remember when the last button was changed for voting
+  gs->ulLastButtonChangeAt = millis();
+  if(digitalRead(LEFT_BUTTON) == LOW)
   {
     Serial.println("** Falling wink from left pin.");
     gs->bLeftButtonDown = true;
-  
-    checkEasterEggMode();
+    gs->sVote=1;
+    //do a short blink, delayMicroseconds works, but its blocking!
+    digitalWrite(LED_LEFT_B, LOW);
+    delayMicroseconds(1000);
+    digitalWrite(LED_LEFT_B, HIGH);
   }
-  else
-  {
-    Serial.println("** Rising wink from left pin.");
-    gs->bLeftButtonDown = false;
-  
-    checkVote(1);
-  }  
 }
 
 // ------------------------------------------------------------------
 void setupPins() 
 {
-  attachInterrupt(digitalPinToInterrupt(LEFT_BUTTON), leftPinChanges, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(RIGHT_BUTTON), rightPinChanges, CHANGE);
+  // we only go for FALLING instead of CHANGING to have less issues with multiple calls, and more time to work on the button
+  attachInterrupt(digitalPinToInterrupt(LEFT_BUTTON), leftPinChanges, FALLING);
+  attachInterrupt(digitalPinToInterrupt(RIGHT_BUTTON), rightPinChanges, FALLING);
 
-  pinMode(LED_LEFT_R, OUTPUT);
-  pinMode(LED_LEFT_G, OUTPUT);
-  pinMode(LED_LEFT_B, OUTPUT);
-
-  analogWrite(LED_LEFT_R, 0);
-  analogWrite(LED_LEFT_G, 0);
-  analogWrite(LED_LEFT_B, 0);
-
-  //pinMode(LED_RIGHT_R, OUTPUT);
-  //pinMode(LED_RIGHT_G, OUTPUT);
-  //pinMode(LED_RIGHT_B, OUTPUT);
-
-  //analogWrite(LED_RIGHT_R, 0);
-  //analogWrite(LED_RIGHT_G, 0);
-  //analogWrite(LED_RIGHT_B, 0);
-
-  // analogWrite(pin, value) enables software PWM on the given pin. PWM may be used on pins 0 to 16. 
+  // analogWrite(pin, value) enables software PWM on the given pin. PWM may be used on pins 0 to 16.
   // Call analogWrite(pin, 0) to disable PWM on the pin. value may be in range from 0 to PWMRANGE, 
   // which is equal to 1023 by default. PWM range may be changed by calling analogWriteRange(new_range).
 
-  // we know 0 to 255 as colour values
+  // we know 0 to 255 as colour intensity values
   analogWriteRange(255);
   
   // PWM frequency is 1kHz by default. Call analogWriteFreq(new_frequency) to change the frequency.
   // 50 Hz is more than OK for us for now
   analogWriteFreq(50);
+
+  //set LEDs as output and set them to HIGH = 255
+  pinMode(LED_LEFT_R, OUTPUT);
+  pinMode(LED_LEFT_G, OUTPUT);
+  pinMode(LED_LEFT_B, OUTPUT);
+
+  //set to high keep it dark
+  analogWrite(LED_LEFT_R, 255);
+  analogWrite(LED_LEFT_G, 255);
+  analogWrite(LED_LEFT_B, 255);
+
+  pinMode(LED_RIGHT_R, OUTPUT);
+  pinMode(LED_RIGHT_G, OUTPUT);
+  pinMode(LED_RIGHT_B, OUTPUT);
+
+  //set to high keep it dark
+  analogWrite(LED_RIGHT_R, 255);
+  analogWrite(LED_RIGHT_G, 255);
+  analogWrite(LED_RIGHT_B, 255);
+
+  // set buttons as input, to be safe
+  pinMode(RIGHT_BUTTON, INPUT);
+  pinMode(LEFT_BUTTON, INPUT);
 }
 
 // ------------------------------------------------------------------
@@ -132,22 +141,21 @@ void setup() {
   // todo: remove when going into production?
   Serial.begin(115200);
   Serial.setDebugOutput(true);
-  Serial.println("");
-  delay(1000);
+  Serial.println(" -=- POWER UP -=- ");
+  delay(1000); //initial bootup, give it some time
 
   // set all needed ports and disable unneeded output ports to save power
   setupPins();
 
   // initialise memory structure (global state)
   gs->ulLoopStartAt = 0;
-  gs->ulLastModeChangeAt = 0;
-  gs->bytCurrentMode = MODE_INIT; 
-  gs->bytNextMode = MODE_NONE;
+  gs->ulLastModeUpdateAt = 0;
+  gs->ulLastButtonChangeAt = 0;
+  gs->bytCurrentMode = MODE_INIT;
   gs->sVote = 0;
-  gs->cLastButtons = (char) 0; 
-  gs->iCycleLength = 1000;
-  gs->bLeftButtonDown = false; 
-  gs->bRightButtonDown = false; 
+  gs->iCycleLength = STANDARD_CYCLE_LENGTH;
+  gs->bLeftButtonDown = false;
+  gs->bRightButtonDown = false;
 
   // movies
   gs->iMovieLeftFrameCount = 0;
@@ -161,7 +169,14 @@ void setup() {
   gs->lMoviePosition = 0; 
   gs->lMovieLength = 0; 
 
-  //
+  gs->sMovieReplayCount = 0;
+  playStockMovie(0);
+
+  //for easteregg code tracking
+  gs->ulEgg = 0;
+
+  // --------------------
+  // start wifi
   WiFi.mode(WIFI_STA);
   
   // get the wifi up and running
@@ -188,7 +203,7 @@ void setup() {
     Serial.println("Wifi not available, going to sleep.");
 
     // todo: blink in a whimpy fashion!
-    
+    playBootError();
     ESP.deepSleep(1 * 10 * 1000000, WAKE_RF_DEFAULT);
     delay(1000);  
   }
@@ -213,23 +228,26 @@ void setup() {
   // Serial.print("Flash ID: ");
   // Serial.println(ESP.getFlashChipId());
   sPJDeviceId = String(ESP.getChipId()) + "_" + String(ESP.getFlashChipId());
-  Serial.println("DeviceId: " + sPJDeviceId);
+  Serial.println("#########################");
+  Serial.println("PJId: " + sPJDeviceId);
+  Serial.println("#########################");
 
-  delay(500);
+  delay(100);
   
   // check if registered already (check EEPROM), register with HARDAC otherwise.
+  // TODO: catch error and add default
   if(sPJDeviceId.length() <= 1)
   {
     Serial.println("sDeviceId is too small. " + sPJDeviceId);
   }
   else
   {
-    // we currently only need one byte, but 4 is the minimum to register for
-    EEPROM.begin(4);
+    // register EEPROM for registration status and last stock movie
+    EEPROM.begin(16);
   
     byte byRegKey = EEPROM.read(EEPROM_REGKEY_ADDRESS);
     
-    Serial.print("EEPROM Value at EEPROM_REGKEY_ADDRESS: 0x");
+    Serial.print("EEPROM Value (0x5F) at EEPROM_REGKEY_ADDRESS: 0x");
     Serial.println(byRegKey, HEX);
     
     if(byRegKey != REGISTERED)
@@ -238,14 +256,9 @@ void setup() {
       registerPJ(sPJDeviceId);
     }
   }
-}
 
-void printWIFIStrength()
-{
-  long rssi = WiFi.RSSI();
-  Serial.print("Signal strength (RSSI):");
-  Serial.print(rssi);
-  Serial.println(" dBm");
+  // read last active movie from EEPROM and load it
+  loadActiveMovieFromEEPROM();
 }
 
 // ------------------------------------------------------------------
@@ -255,77 +268,65 @@ void loop() {
 
   gs->ulLoopStartAt = millis();
 
-  Serial.println("--");
   Serial.println("--------------------------------------------------------------------");
+  Serial.print("-- loop(");
+  Serial.print(millis());
+  Serial.println(") --");
   Serial.println("Modes");
   Serial.print("- Current Mode: ");
   Serial.println(gs->bytCurrentMode);
-  // we will see if mode gets switched
-  //Serial.print("- Next Mode: ");
-  //Serial.println(gs->bytNextMode);
+  Serial.print("- Button Left:  ");
+  Serial.println(gs->bLeftButtonDown);
+  Serial.print("- Button Right: ");
+  Serial.println(gs->bRightButtonDown);
 
-  // enable wifi if next mode needs it and current has not active already
-  if((gs->bytCurrentMode != MODE_VOTE && gs->bytCurrentMode != MODE_UPDATE)
-      && (gs->bytNextMode == MODE_VOTE || gs->bytNextMode == MODE_UPDATE))
+  // handle all button presses (easter egg as well as votes)
+  handleInput();
+
+  // if not in easteregg mode then switch
+  if(gs->bytCurrentMode != MODE_EASTEREGG)
   {
-    //WiFi.forceSleepWake();
-    Serial.println("Force Sleep Wake");
-  }
-  else
-  {
-    //WiFi.forceSleepBegin();
-    Serial.println("Force Sleep Begin");
-  }
-
-  // switch modes?
-  if(gs->bytNextMode != MODE_NONE)
-  {
-    Serial.print("Switching modes, because ");
-    Serial.print(gs->bytNextMode);
-    Serial.print(" is not ");
-    Serial.println(MODE_NONE);
-
-    gs->ulLastModeChangeAt = millis();
-
-    // depending on the new mode, do the transformation
-    gs->bytCurrentMode = gs->bytNextMode;
-    gs->bytNextMode = MODE_NONE;
-
-    Serial.print("- New Mode: ");
-    Serial.println(gs->bytCurrentMode);
-    // makes no sense, is always NONE
-    //Serial.print("- Next Mode: ");
-    //Serial.println(gs->bytNextMode);
+    switch(gs->bytCurrentMode)
+    {
+      default:
+      case MODE_IDLE:
+        // show movie, change mode to Update after N loops
+        handleIdle();
+      break;
+      case MODE_INIT:
+        // Initialise something? otherwise head right into Update mode.
+        gs->bytCurrentMode = MODE_UPDATE;
+      break;
+      case MODE_UPDATE:
+        gs->ulLastModeUpdateAt = millis();
+        gs->bytCurrentMode = MODE_IDLE;
+        handleUpdate();
+      break;
+    }
   }
 
-  switch(gs->bytCurrentMode)
+  // clear last vote if not button was pressed for X minutes
+  if((millis() - gs->ulLastButtonChangeAt > VOTE_CLEAR_TIME * SECONDS_TO_MILLIS) && gs->sVote != EMPTY_VOTE)
   {
-    default:
-    case MODE_IDLE:
-      // sleep and wait, change mode to Update after N loops
-      handleIdle();
-    break;
-    case MODE_INIT:
-      // Initialise something? otherwise head right into Update mode.
-      gs->bytNextMode = MODE_UPDATE;
-      break;
-    case MODE_UPDATE:
-      printWIFIStrength();
-      handleUpdate();
-      break;
-    case MODE_MOVIE:
-      handleMovie();
-      break;
-    case MODE_VOTE:
-      handleVote();
-      break;
-    case MODE_EASTEREGG:
-      handleEasterEgg();
-    break;
+    Serial.print("### Resetting vote, it was:");
+    Serial.println(gs->sVote);
+    gs->sVote = 0;
+    gs->ulLastButtonChangeAt = millis();
+  }
+
+  // clear easteregg mode if not button was pressed for Y minutes
+  if((millis() - gs->ulLastButtonChangeAt > EASTEREGG_CLEAR_TIME * SECONDS_TO_MILLIS) && gs->bytCurrentMode == MODE_EASTEREGG)
+  {
+    Serial.println("### Leaving easteregg mode due to inactivity -> IDLE");
+    gs->bytCurrentMode = MODE_IDLE;
+    // reset buttons as well, just in case
+    gs->bLeftButtonDown = false;
+    gs->bRightButtonDown = false;
+    gs->sVote = 0;
   }
   
   Serial.println();
-  Serial.println("Ending loop");
+  Serial.println("Ending loop -> clean up -> stats");
 
   // try to have a constant "frame" rate
   long lDelayTime = gs->iCycleLength - (millis() - gs->ulLoopStartAt);
@@ -349,3 +350,4 @@ void loop() {
   Serial.println(millis() - gs->ulLoopStartAt);
 }
 
+//EOF

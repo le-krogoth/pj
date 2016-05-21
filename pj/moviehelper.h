@@ -30,11 +30,16 @@
 #include <stdlib.h>
 #include "flow.h"
 
-void loadMovieFailed();
-void loadMovieSucceeded();
-void loadMovie(const char* movieLeft, const char* movieRight);
+void playWarning();
+void playSuccess();
+void playError();
+void playBootError();
 
-int getAnalogueValue(char colour);
+void loadMovie(const char* movieLeft, const char* movieRight);
+void playStockMovie(const unsigned short sStockMovieIndex);
+
+int hex2dec(char cHexVal);
+int convert2AnalogueValue(char colour);
 
 // internal use only
 void serialPrintMovieParsed();
@@ -42,5 +47,8 @@ void serialPrintMovieParsed();
 // internal use only
 movieframe *addMFLeft(const char r, const char g, const char b, const int position);
 movieframe *addMFRight(const char r, const char g, const char b, const int position);
+
+void storeActiveMovieToEEPROM(const unsigned short sStockMovieIndex);
+void loadActiveMovieFromEEPROM();
 
 #endif // H_MOVIEHELPER

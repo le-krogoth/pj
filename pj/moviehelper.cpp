@@ -27,23 +27,86 @@
 #include "moviehelper.h"
 #include "global.h"
 //#include <ESP8266WiFi.h>
+#include <EEPROM.h> // to store status/registration in
 
-void loadMovieFailed()
+void playWarning()
 {
-  loadMovie("F0020002F0020002F0020002", "F0020002F0020002F0020002"); 
+  for(int j=0; j < ERROR_SUCCESS_BLINKCOUNT; j++ )
+  {
+    digitalWrite(LED_RIGHT_B, LOW);
+    delay(50);
+    digitalWrite(LED_RIGHT_B, HIGH);
+    delay(50);
+  }
 }
 
-void loadMovieSucceeded()
+void playSuccess()
 {
-  loadMovie("0F0200020F0200020F020002", "0F0200020F0200020F020002");
+  for(int j=0; j < ERROR_SUCCESS_BLINKCOUNT; j++ )
+  {
+    digitalWrite(LED_RIGHT_G, LOW);
+    delay(50);
+    digitalWrite(LED_RIGHT_G, HIGH);
+    delay(50);
+  }
+}
+
+void playError()
+{
+  for (int j=0; j < ERROR_SUCCESS_BLINKCOUNT; j++ )
+  {
+    digitalWrite(LED_RIGHT_R, LOW);
+    delay(50);
+    digitalWrite(LED_RIGHT_R, HIGH);
+    delay(50);
+  }
+}
+
+void playBootError()
+{
+  for (int j=0; j < ERROR_SUCCESS_BLINKCOUNT; j++ )
+  {
+    digitalWrite(LED_LEFT_R, LOW);
+    digitalWrite(LED_RIGHT_R, LOW);
+    delay(50);
+    digitalWrite(LED_LEFT_R, HIGH);
+    digitalWrite(LED_RIGHT_R, HIGH);
+    delay(50);
+    digitalWrite(LED_LEFT_B, LOW);
+    digitalWrite(LED_RIGHT_B, LOW);
+    delay(50);
+    digitalWrite(LED_RIGHT_B, HIGH);
+    digitalWrite(LED_LEFT_B, HIGH);
+    delay(50);
+  }
+}
+
+void playStockMovie(const unsigned short sStockMovieIndex)
+{
+  if(sStockMovieIndex < STOCK_MOVIE_ARRAY_SIZE)
+  {
+    storeActiveMovieToEEPROM(sStockMovieIndex);
+    loadMovie(STOCK_MOVIES_LEFT[sStockMovieIndex].c_str(), STOCK_MOVIES_RIGHT[sStockMovieIndex].c_str());
+  }
+  else
+  {
+    Serial.println("Movie could not be loaded because Index was bigger than StockMovie Array.");
+  }
 }
 
 void loadMovie(const char* movieLeft, const char* movieRight)
 {
-  Serial.println("loadingMovies");
+  Serial.println("loadingMovies:");
+  Serial.println(movieLeft);
+  Serial.println(movieRight);
+
+  // reset movie counters
+  gs->iMovieLeftFrameCount = 0;
+  gs->iMovieRightFrameCount = 0;
+  gs->lMovieLength = 0;
     
-    int iMovieLeftLength = strlen(movieLeft);
-    int iMovieLeftElements = iMovieLeftLength / 4;
+  int iMovieLeftLength = strlen(movieLeft);
+  int iMovieLeftElements = iMovieLeftLength / 4;
     
     int pos = 0;
     int iLocationLeft = 0;
@@ -54,7 +117,7 @@ void loadMovie(const char* movieLeft, const char* movieRight)
 
         temp = addMFLeft(movieLeft[pos], movieLeft[pos + 1], movieLeft[pos + 2], iLocationLeft);
 
-        iLocationLeft += (getAnalogueValue(movieLeft[pos + 3]));
+        iLocationLeft += hex2dec(movieLeft[pos + 3]);
 
         pos += 4;
     }
@@ -73,7 +136,7 @@ void loadMovie(const char* movieLeft, const char* movieRight)
 
         temp = addMFRight(movieRight[pos], movieRight[pos + 1], movieRight[pos + 2], iLocationRight);
 
-        iLocationRight += (getAnalogueValue(movieRight[pos + 3]));
+        iLocationRight += hex2dec(movieRight[pos + 3]);
 
         pos += 4;
     }
@@ -85,6 +148,11 @@ void loadMovie(const char* movieLeft, const char* movieRight)
 
     delay(10);
 
+    Serial.print("iLocationLeft:");
+    Serial.println(iLocationLeft);
+    Serial.print("iLocationRight:");
+    Serial.println(iLocationRight);
+
     // calculate length of whole movie, take bigger number
     gs->lMovieLength = iLocationLeft > iLocationRight ? iLocationLeft : iLocationRight;
 
@@ -93,7 +161,6 @@ void loadMovie(const char* movieLeft, const char* movieRight)
 
     // reset movie to start position
     gs->lMoviePosition = 0;
-    gs->bytNextMode = MODE_MOVIE;
 }
 
 void serialPrintMovieParsed()
@@ -147,7 +214,7 @@ movieframe *addMFLeft(const char r, const char g, const char b, const int positi
     if (gs->iMovieLeftFrameCount == gs->iMovieLeftFrameCapacity)
     {
         // TODO: define growth size
-        gs->iMovieLeftFrameCapacity += 2;
+        gs->iMovieLeftFrameCapacity += MOVIE_MEMORY_GROWTH_SIZE;
 
         gs->movieLeft = (struct movieframe *)realloc(gs->movieLeft, sizeof(state) * gs->iMovieLeftFrameCapacity);
     }
@@ -168,7 +235,7 @@ movieframe *addMFRight(const char r, const char g, const char b, const int posit
     if (gs->iMovieRightFrameCount == gs->iMovieRightFrameCapacity)
     {
         // TODO: define growth size
-        gs->iMovieRightFrameCapacity += 2;
+        gs->iMovieRightFrameCapacity += MOVIE_MEMORY_GROWTH_SIZE;
 
         gs->movieRight = (struct movieframe *)realloc(gs->movieRight, (sizeof(state) * gs->iMovieRightFrameCapacity));
     }
@@ -184,14 +251,26 @@ movieframe *addMFRight(const char r, const char g, const char b, const int posit
     return mf;
 }
 
-int getAnalogueValue(char colour)
+int hex2dec(char cHexVal)
 {
   char cHex[2];
   memset(cHex, 0x00, sizeof(cHex));
-    
-  cHex[0] = colour;
-    
+
+  cHex[0] = cHexVal;
+
   int iVal = strtol(cHex, NULL, 16);
+  Serial.print("Converting hex from: ");
+  Serial.print(cHexVal);
+
+  Serial.print(" to dec: ");
+  Serial.println(iVal);
+
+  return iVal;
+}
+
+int convert2AnalogueValue(char colour)
+{
+  int iVal = hex2dec(colour);
   Serial.print("Converting colour from: ");
   Serial.print(colour);
     
@@ -201,3 +280,65 @@ int getAnalogueValue(char colour)
 
   return iAnalogVal;
 }
+
+void storeActiveMovieToEEPROM(const unsigned short sStockMovieIndex)
+{
+  // store ID, movie index
+  Serial.println("storeActiveMovie()");
+
+  //  EEPROM.length() not required as we dont save dynamic content
+  int eeAddress = EEPROM_MOVIE_ADDRESS;
+  EEPROM.put(eeAddress, MAGICMOVIE);
+  eeAddress +=sizeof(MAGICMOVIE);
+  EEPROM.put(eeAddress, sStockMovieIndex);
+  eeAddress +=sizeof(sStockMovieIndex);
+
+  EEPROM.commit();
+  Serial.print("Written to EEPROM: ");
+  Serial.print(eeAddress - EEPROM_MOVIE_ADDRESS);
+  Serial.println(" bytes");
+
+  //save new movie as soft default as well
+  Serial.println("updated ActiveMovies");
+  gs->sStockMovieActiveIndex = sStockMovieIndex;
+}
+
+void loadActiveMovieFromEEPROM()
+{
+  Serial.println("loadActiveMovie()");
+
+  byte byMagicNumber = 0;
+  int iEEAddress = EEPROM_MOVIE_ADDRESS;
+
+  EEPROM.get(iEEAddress, byMagicNumber);
+  iEEAddress +=sizeof(byMagicNumber);
+
+  unsigned short sStockMovieIndex;
+
+  // memory seems correct, lets load the stored movie
+  if(byMagicNumber == MAGICMOVIE)
+  {
+    EEPROM.get(iEEAddress, sStockMovieIndex);
+
+    Serial.print("Loaded the following movie index:");
+    Serial.println(sStockMovieIndex);
+  }
+  else
+  {
+    Serial.print("Error reading movie from EEPROM:");
+    Serial.println(byMagicNumber, HEX);
+    // load default movie instead
+    sStockMovieIndex = 0;
+  }
+
+  if(sStockMovieIndex < STOCK_MOVIE_ARRAY_SIZE)
+  {
+    playStockMovie[sStockMovieIndex];
+  }
+  else
+  {
+    Serial.println("Movie could not be loaded because Index was bigger than StockMovie Array.");
+  }
+}
+
+// EOF

@@ -36,8 +36,8 @@ static const byte MODE_NONE       = 0x00;
 static const byte MODE_INIT       = 0x01;
 static const byte MODE_IDLE       = 0x02;
 static const byte MODE_UPDATE     = 0x03;
-static const byte MODE_MOVIE      = 0x04;
-static const byte MODE_VOTE       = 0x05;
+//static const byte MODE_MOVIE      = 0x04;
+//static const byte MODE_VOTE       = 0x05;
 static const byte MODE_EASTEREGG  = 0x06;
 
 // one element of a movie
@@ -53,9 +53,9 @@ typedef struct movieframe
 typedef struct state
 {
   unsigned long ulLoopStartAt;
-  unsigned long ulLastModeChangeAt;
+  unsigned long ulLastModeUpdateAt;
+  unsigned long ulLastButtonChangeAt;
   byte bytCurrentMode;
-  byte bytNextMode;
   int iMovieLeftFrameCount;
   int iMovieLeftFrameCapacity;
   movieframe *movieLeft;
@@ -66,14 +66,13 @@ typedef struct state
   long lMovieLength;
   short sVote;
   int iCycleLength;
-  char* cLastButtons;
   bool bLeftButtonDown;
   bool bRightButtonDown;
+  unsigned long ulEgg;
+  unsigned short sMovieReplayCount;
+  unsigned short sStockMovieActiveIndex;
 } state;
 
 extern state *gs;
-
-void checkEasterEggMode();
-void checkVote(short sVote);
 
 #endif // H_FLOW
