@@ -34,8 +34,12 @@ void playWarning();
 void playSuccess();
 void playError();
 void playBootError();
+void clearAllLEDs();
 
 void loadMovie(const char* movieLeft, const char* movieRight);
+
+void playStockMovie(const unsigned short sStockMovieIndex, const bool bStoreInEEPROM);
+// overload sends false to playStockMovie(sStockMovieIndex, bStoreInEEPROM)
 void playStockMovie(const unsigned short sStockMovieIndex);
 
 int hex2dec(char cHexVal);

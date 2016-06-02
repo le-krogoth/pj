@@ -40,7 +40,7 @@ bool registerPJ(String sDeviceId)
   switch (r.iStatusCd)
     {
       case 420:
-        //calm down, reset the eeprom in case of failed sync
+        // calm down, reset the eeprom in case of failed sync
         // TODO: Find out why this can happen
         EEPROM.write(EEPROM_REGKEY_ADDRESS, REGISTERED);
         EEPROM.commit();
@@ -132,6 +132,40 @@ reply callUrl(String sUrl)
   }
   
   return r;
+}
+
+byte readWifiBootEeprom()
+{
+  Serial.print("readWifiModeEeprom() ");
+
+  byte byMagicNumber = 0;
+
+  EEPROM.get(EEPROM_WIFITOGGLE_ADDRESS, byMagicNumber);
+
+  Serial.print("Magic Number: ");
+  Serial.println(byMagicNumber, HEX);
+
+  if(byMagicNumber == BOOTWIFI_OFF)
+  {
+    return BOOTWIFI_OFF;
+  }
+  else
+  {
+    return BOOTWIFI_ON;
+  }
+}
+
+
+void writeWifiBootEeprom(const byte byMagicNumber)
+{
+  //toggle if we should deepsleep when wifi is not found
+  Serial.print("writeWifiModeEeprom() ");
+
+  EEPROM.put(EEPROM_WIFITOGGLE_ADDRESS, byMagicNumber);
+  EEPROM.commit();
+
+  Serial.print("Magic Number: ");
+  Serial.println(byMagicNumber,HEX);
 }
 
 //EOF

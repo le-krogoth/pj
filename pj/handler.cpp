@@ -63,6 +63,7 @@ void handleUpdateReply(reply r)
       break;
     case 403:
       Serial.println("Function called without being registered.");
+      registerPJ(sPJDeviceId); //try to register
       break;
     case 420:
       Serial.println("Re-registration attempt, HARDAC tells us to calm down.");
@@ -106,6 +107,17 @@ void handleUpdateReply(reply r)
     Serial.print("cl: ");
     Serial.println(gs->iCycleLength);
 
+    if (mrc == 101)
+    {
+        Serial.println(" = Switching wifi boot check off =");
+        writeWifiBootEeprom(BOOTWIFI_OFF);
+    }
+    if (mrc == 102)
+    {
+        Serial.println(" = Switching wifi boot check on =");
+        writeWifiBootEeprom(BOOTWIFI_ON);
+    }
+
     playSuccess();
     loadMovie(colourLeft, colourRight);
   }
@@ -126,7 +138,7 @@ void handleVoteReply(reply r)
   {
     playSuccess();
     Serial.println(" Vote sent successfully");
-    gs->sVote = 0;
+    gs->sVote = EMPTY_VOTE;
   }
   else
   {
@@ -138,7 +150,7 @@ void handleVoteReply(reply r)
 // ------------------------------------------------------------------
 void handleInput()
 {
-  Serial.print(" - handleEasterEgg() -> ");
+  Serial.print(" - handleInput()");
   Serial.println(gs->ulEgg);
   
   // check buttons for easteregg mode - enter if both buttons are down
@@ -157,10 +169,12 @@ void handleInput()
     {     
       // leave easter egg mode as both buttons are pressed
       gs->bytCurrentMode = MODE_IDLE;
-      gs->sVote = 0;
-      playWarning();
+      gs->sVote = EMPTY_VOTE;
     }
-    
+
+    clearAllLEDs();
+    playWarning();
+
     // clear buttons
     gs->bLeftButtonDown = false;
     gs->bRightButtonDown = false;
@@ -203,15 +217,15 @@ void handleInput()
   {
     case EGG_CODE_1:
       foundsomething = true;
-      playStockMovie(1);
+      playStockMovie(1, true);
     break;
     case EGG_CODE_2:
       foundsomething = true;
-      playStockMovie(2);
+      playStockMovie(2, true);
     break;
     case EGG_CODE_3:
       foundsomething = true;
-      playStockMovie(3);
+      playStockMovie(3, true);
     break;
   }
 
@@ -234,7 +248,7 @@ void handleInput()
     gs->ulEgg = 0;
 
     //blink for reset
-    playWarning();
+    playError();
    }
 }
 
@@ -247,6 +261,8 @@ void handleIdle()
     // if enough time passed, go into UPDATE mode
     gs->bytCurrentMode = MODE_UPDATE;
   }
+
+  handleMovie();
 }
 
 // ------------------------------------------------------------------
@@ -334,6 +350,7 @@ void handleMovie()
   // if the movie is over, clean up and reset to beginning of movie (endless loop)
   if(gs->lMoviePosition >= gs->lMovieLength)
   {
+    Serial.println(" Movie is over, restart it");
     // TODO: fix memory allocation here?
     gs->lMoviePosition = 0;
 
@@ -347,6 +364,8 @@ void handleMovie()
     if (gs->sMovieReplayCount > 0)
     {
         gs->sMovieReplayCount--;
+        Serial.print(" MovieReplayCount:");
+        Serial.println(gs->sMovieReplayCount);
     }
   }
 }
@@ -354,7 +373,9 @@ void handleMovie()
 // ------------------------------------------------------------------
 void goOnline()
 {
-  Serial.print("Handle Update: ");
+  Serial.print("goOnline -> Handle Update: ");
+
+  clearAllLEDs();
 
   // this is the only function that needs Wifi
   // Wakeup Wifi, WiFi.forceSleepWake(); didnt bring too much saving
@@ -402,6 +423,7 @@ void handleUpdate()
   reply r = callUrl(sUrl);
 
   handleUpdateReply(r);
+  delay(10);
 }
 
 // ------------------------------------------------------------------

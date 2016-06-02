@@ -81,8 +81,27 @@ void playBootError()
   }
 }
 
+void clearAllLEDs()
+{
+    analogWrite(LED_LEFT_R, 255);
+    analogWrite(LED_RIGHT_R, 255);
+    analogWrite(LED_LEFT_G, 255);
+    analogWrite(LED_RIGHT_G, 255);
+    analogWrite(LED_LEFT_B, 255);
+    analogWrite(LED_RIGHT_B, 255);
+    Serial.println(" All LEDs cleared");
+}
+
 void playStockMovie(const unsigned short sStockMovieIndex)
 {
+    playStockMovie(sStockMovieIndex, false);
+}
+
+void playStockMovie(const unsigned short sStockMovieIndex, const bool bStoreInEEPROM)
+{
+  Serial.print("PlayStockMovie: ");
+  Serial.println(sStockMovieIndex);
+
   if(sStockMovieIndex < STOCK_MOVIE_ARRAY_SIZE)
   {
     storeActiveMovieToEEPROM(sStockMovieIndex);
@@ -274,7 +293,9 @@ int convert2AnalogueValue(char colour)
   Serial.print("Converting colour from: ");
   Serial.print(colour);
     
-  int iAnalogVal = (iVal * 17);
+  // dim the LEDs
+  int iAnalogVal = (iVal * LED_BRIGHTNESS);
+
   Serial.print(" to ");
   Serial.println(iAnalogVal);
 
@@ -284,14 +305,16 @@ int convert2AnalogueValue(char colour)
 void storeActiveMovieToEEPROM(const unsigned short sStockMovieIndex)
 {
   // store ID, movie index
-  Serial.println("storeActiveMovie()");
+  Serial.println("storeActiveMovieToEEPROM()");
 
   //  EEPROM.length() not required as we dont save dynamic content
   int eeAddress = EEPROM_MOVIE_ADDRESS;
+
   EEPROM.put(eeAddress, MAGICMOVIE);
-  eeAddress +=sizeof(MAGICMOVIE);
+  eeAddress += sizeof(MAGICMOVIE);
+
   EEPROM.put(eeAddress, sStockMovieIndex);
-  eeAddress +=sizeof(sStockMovieIndex);
+  eeAddress += sizeof(sStockMovieIndex);
 
   EEPROM.commit();
   Serial.print("Written to EEPROM: ");
@@ -305,13 +328,13 @@ void storeActiveMovieToEEPROM(const unsigned short sStockMovieIndex)
 
 void loadActiveMovieFromEEPROM()
 {
-  Serial.println("loadActiveMovie()");
+  Serial.println("loadActiveMovieFromEEPROM()");
 
   byte byMagicNumber = 0;
   int iEEAddress = EEPROM_MOVIE_ADDRESS;
 
   EEPROM.get(iEEAddress, byMagicNumber);
-  iEEAddress +=sizeof(byMagicNumber);
+  iEEAddress += sizeof(byMagicNumber);
 
   unsigned short sStockMovieIndex;
 
@@ -333,7 +356,7 @@ void loadActiveMovieFromEEPROM()
 
   if(sStockMovieIndex < STOCK_MOVIE_ARRAY_SIZE)
   {
-    playStockMovie[sStockMovieIndex];
+    playStockMovie(sStockMovieIndex);
   }
   else
   {

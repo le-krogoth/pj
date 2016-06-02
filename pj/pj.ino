@@ -105,27 +105,20 @@ void setupPins()
   analogWriteRange(255);
   
   // PWM frequency is 1kHz by default. Call analogWriteFreq(new_frequency) to change the frequency.
-  // 50 Hz is more than OK for us for now
-  analogWriteFreq(50);
+  // 45 Hz is more than OK for us for now
+  analogWriteFreq(45);
 
   //set LEDs as output and set them to HIGH = 255
   pinMode(LED_LEFT_R, OUTPUT);
   pinMode(LED_LEFT_G, OUTPUT);
   pinMode(LED_LEFT_B, OUTPUT);
 
-  //set to high keep it dark
-  analogWrite(LED_LEFT_R, 255);
-  analogWrite(LED_LEFT_G, 255);
-  analogWrite(LED_LEFT_B, 255);
-
   pinMode(LED_RIGHT_R, OUTPUT);
   pinMode(LED_RIGHT_G, OUTPUT);
   pinMode(LED_RIGHT_B, OUTPUT);
 
-  //set to high keep it dark
-  analogWrite(LED_RIGHT_R, 255);
-  analogWrite(LED_RIGHT_G, 255);
-  analogWrite(LED_RIGHT_B, 255);
+  //set all LEDs to high keep it dark
+  clearAllLEDs();
 
   // set buttons as input, to be safe
   pinMode(RIGHT_BUTTON, INPUT);
@@ -152,7 +145,7 @@ void setup() {
   gs->ulLastModeUpdateAt = 0;
   gs->ulLastButtonChangeAt = 0;
   gs->bytCurrentMode = MODE_INIT;
-  gs->sVote = 0;
+  gs->sVote = EMPTY_VOTE;
   gs->iCycleLength = STANDARD_CYCLE_LENGTH;
   gs->bLeftButtonDown = false;
   gs->bRightButtonDown = false;
@@ -170,7 +163,6 @@ void setup() {
   gs->lMovieLength = 0; 
 
   gs->sMovieReplayCount = 0;
-  playStockMovie(0);
 
   //for easteregg code tracking
   gs->ulEgg = 0;
@@ -195,9 +187,15 @@ void setup() {
     Serial.print(".");
   }
 
+  // register EEPROM for registration status and last stock movie
+  EEPROM.begin(16);
+
+  // see if we need to ignore the wifi check, the updates will fail, but we dont care
+  byte byWificheck = readWifiBootEeprom();
+
   // go back into deep sleep mode for now when there is no wifi
   // TODO: add this check to the state machine?
-  if(WiFi.status() != WL_CONNECTED)
+  if(WiFi.status() != WL_CONNECTED && byWificheck == BOOTWIFI_ON)
   {
     Serial.println("");
     Serial.println("Wifi not available, going to sleep.");
@@ -216,7 +214,7 @@ void setup() {
 
   // print the received signal strength:
   long rssi = WiFi.RSSI();
-  Serial.print("Signal strength (RSSI):");
+  Serial.print(" Signal strength (RSSI):");
   Serial.print(rssi);
   Serial.println(" dBm");
 
@@ -242,9 +240,6 @@ void setup() {
   }
   else
   {
-    // register EEPROM for registration status and last stock movie
-    EEPROM.begin(16);
-  
     byte byRegKey = EEPROM.read(EEPROM_REGKEY_ADDRESS);
     
     Serial.print("EEPROM Value (0x5F) at EEPROM_REGKEY_ADDRESS: 0x");
@@ -300,7 +295,7 @@ void loop() {
       case MODE_UPDATE:
         gs->ulLastModeUpdateAt = millis();
         gs->bytCurrentMode = MODE_IDLE;
-        handleUpdate();
+        goOnline();
       break;
     }
   }
@@ -310,7 +305,7 @@ void loop() {
   {
     Serial.print("### Resetting vote, it was:");
     Serial.println(gs->sVote);
-    gs->sVote = 0;
+    gs->sVote = EMPTY_VOTE;
     gs->ulLastButtonChangeAt = millis();
   }
 
@@ -322,7 +317,7 @@ void loop() {
     // reset buttons as well, just in case
     gs->bLeftButtonDown = false;
     gs->bRightButtonDown = false;
-    gs->sVote = 0;
+    gs->sVote = EMPTY_VOTE;
   }
   
   Serial.println();
