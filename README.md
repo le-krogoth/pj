@@ -27,9 +27,7 @@ at times. The mentioned dev boards take away much of that frustration potential.
 If you want to flash the badge, consider to attach some pins to the connections on the left. This will help in getting
 a connection which is much more stable. And the ESP8266 hates unstable connections during flashing. Power as well as RX/TX...
 
-
 ## Installation ##
-
 Make sure you do have a recent Arduino IDE. Then follow these instructions (Board Manager works fine with NodeMCU, YMMV):
 
 https://github.com/esp8266/Arduino
@@ -41,9 +39,7 @@ Make sure to have a HARDAC instance running as well.
 Please make sure that you connect RX->TX, TX->RX and reset the board (by holding the right button or whatever is needed 
 on your board) and starting power. You need to pull down GPIO0 to GND on the ESP8266 to puts the chip into flashing mode.
 
-
 ## Licence ##
-
 This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU Affero General Public License as published
  by the Free Software Foundation, either version 3 of the License, or
