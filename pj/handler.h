@@ -31,11 +31,12 @@
 #include "comm.h" // for reply
 #include "flow.h" // for gs
 
-
+void printWIFIStrength();
 void handleUpdateReply(reply r);
-void handleEasterEgg();
+void handleInput();
 void handleIdle();
 void handleMovie();
+void goOnline();
 void handleUpdate();
 void handleVote();
 

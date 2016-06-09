@@ -37,6 +37,7 @@ https://github.com/esp8266/Arduino
 Open up the pj.ino file in the Arduino IDE, select your ESP8266 board, compile and flash. Make sure to change the 
 ssid, pwd and server setup to your setup. You can find all of these settings in the global.h file.
 
+Make sure to have a HARDAC instance running as well.
 Please make sure that you connect RX->TX, TX->RX and reset the board (by holding the right button or whatever is needed 
 on your board) and starting power. You need to pull down GPIO0 to GND on the ESP8266 to puts the chip into flashing mode.
 

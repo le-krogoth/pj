@@ -41,4 +41,7 @@ bool unregisterPJ(String sDeviceId);
 
 reply callUrl(String sUrl);
 
+void writeWifiBootEeprom(const byte byMagicNumber);
+byte readWifiBootEeprom();
+
 #endif // H_COMM

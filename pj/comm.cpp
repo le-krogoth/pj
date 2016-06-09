@@ -26,6 +26,7 @@
 */
 #include "comm.h"
 #include "global.h"
+#include "moviehelper.h"
 #include <ESP8266WiFi.h>
 #include <EEPROM.h> // to store status/registration in
 
@@ -36,18 +37,26 @@ bool registerPJ(String sDeviceId)
   String sUrl = "/" + sDeviceId + "/r/public_key/";
   reply r = callUrl(sUrl);
 
-  if(r.iStatusCd != 201)
-  {
-    Serial.print("Registration of PJ failed with StatusCode: ");
-    Serial.println(r.iStatusCd);
-  }
-  else
-  {
-    // registration successful, make sure, that device knows after reboot
-    EEPROM.write(EEPROM_REGKEY_ADDRESS, REGISTERED);
-    EEPROM.commit();
-    Serial.println("Registration of PJ succeeded.");
-  }
+  switch (r.iStatusCd)
+    {
+      case 420:
+        // calm down, reset the eeprom in case of failed sync
+        // TODO: Find out why this can happen
+        EEPROM.write(EEPROM_REGKEY_ADDRESS, REGISTERED);
+        EEPROM.commit();
+        Serial.println("HARDAC says this device was registered before");
+      break;
+      case 201:
+        // registration successful, make sure, that device knows after reboot
+        EEPROM.write(EEPROM_REGKEY_ADDRESS, REGISTERED);
+        EEPROM.commit();
+        Serial.println("Registration of PJ succeeded.");
+      break;
+      default:
+        Serial.print("Registration of PJ failed with StatusCode: ");
+        Serial.println(r.iStatusCd);
+      break;
+    }
 }
 
 // todo: unregister when asked by backend
@@ -87,7 +96,7 @@ reply callUrl(String sUrl)
   client.print(String("GET ") + sUrl + " HTTP/1.1\r\n" + "Host: " + SERVER + "\r\n" + "Connection: close\r\n\r\n");
                
   // just a short delay to give other components the chance to do something else
-  delay(100);
+  delay(50);
 
   // handling of response
   Serial.println("");
@@ -109,7 +118,7 @@ reply callUrl(String sUrl)
         r.iStatusCd = (int)sStatus.toInt();
     } 
     // todo: how can we detect the JSON payload?
-    else if (sLine.startsWith("{ \"colour_1\": ")) 
+    else if (sLine.startsWith("{ \"m1\": "))
     {
       r.sReply = sLine;
     }
@@ -124,3 +133,39 @@ reply callUrl(String sUrl)
   
   return r;
 }
+
+byte readWifiBootEeprom()
+{
+  Serial.print("readWifiModeEeprom() ");
+
+  byte byMagicNumber = 0;
+
+  EEPROM.get(EEPROM_WIFITOGGLE_ADDRESS, byMagicNumber);
+
+  Serial.print("Magic Number: ");
+  Serial.println(byMagicNumber, HEX);
+
+  if(byMagicNumber == BOOTWIFI_OFF)
+  {
+    return BOOTWIFI_OFF;
+  }
+  else
+  {
+    return BOOTWIFI_ON;
+  }
+}
+
+
+void writeWifiBootEeprom(const byte byMagicNumber)
+{
+  //toggle if we should deepsleep when wifi is not found
+  Serial.print("writeWifiModeEeprom() ");
+
+  EEPROM.put(EEPROM_WIFITOGGLE_ADDRESS, byMagicNumber);
+  EEPROM.commit();
+
+  Serial.print("Magic Number: ");
+  Serial.println(byMagicNumber,HEX);
+}
+
+//EOF
